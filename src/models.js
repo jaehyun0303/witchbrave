@@ -1,6 +1,7 @@
 // 절차적(코드 생성) 3D 모델. 나중에 glTF 모델로 교체할 때는 같은 rig 구조만 맞추면 된다.
 import * as THREE from 'three';
 import { tex } from './tex.js';
+import { lichReady, applyLich } from './lichglb.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
   color, roughness: o.r ?? .55, metalness: o.m ?? 0, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1, flatShading: o.flat ?? false,
@@ -95,6 +96,7 @@ export function buildCookie(def) {
     if (id === 'sugar') { const h = new THREE.Mesh(new THREE.TorusGeometry(.4, .04, 8, 32), new THREE.MeshBasicMaterial({ color: 0xffe0f2 })); h.position.y = .95; h.rotation.x = Math.PI / 2; head.add(h); }
     const wp = grp(); wp.add(cyl(.04, .04, 1.4, M(0x333344), 0, -.5, 0), sph(.2, M(def.color, { e: def.color, ei: 1.4 }), 0, -1.25, 0)); wp.rotation.x = -1.0; hand.add(wp); rig.weapon = wp;
   }
+  if (id === 'lich' && lichReady()) { applyLich(rig); delete rig.extras['wing-1']; delete rig.extras['wing1']; }
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

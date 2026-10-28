@@ -497,7 +497,7 @@ function animate(f, dt) {
   R.body.position.y = bob + Math.abs(Math.sin(T * 12)) * .06 * run; R.body.rotation.set(run * .12, 0, 0);
   R.legL.rotation.x = Math.sin(T * 12) * .8 * run; R.legR.rotation.x = -Math.sin(T * 12) * .8 * run;
   R.armL.rotation.set(-Math.sin(T * 12) * .7 * run, 0, .12 + Math.sin(T * 3) * .04); R.armR.rotation.set(Math.sin(T * 12) * .5 * run - .15, 0, -.12);
-  R.head.rotation.set(0, 0, 0); R.head.position.y = 1.65; R.torso.rotation.set(0, 0, 0);
+  R.head.rotation.set(0, 0, 0); R.head.position.y = R.headY ?? 1.65; R.torso.rotation.set(0, 0, 0);
   if (R.weapon) R.weapon.rotation.x = -1.0;
   const ex = R.extras;
   if (ex.crystals) ex.crystals.forEach((c, i) => { const a = c.userData.a + T * 1.6; c.position.set(Math.cos(a) * .9, 1.0 + Math.sin(T * 2 + i) * .25, Math.sin(a) * .9); c.rotation.y += dt * 3; });

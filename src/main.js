@@ -1,2 +1,3 @@
 import { init } from './game.js';
-init();
+import { preloadLich } from './lichglb.js';
+preloadLich().then(init);
