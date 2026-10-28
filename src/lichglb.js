@@ -58,7 +58,7 @@ export function splitLich(gltfScene) {
 
 let cache = null;
 export function lichReady() { return cache; }
-export function preloadLich(url = 'assets/models/lich.glb') {
+export function preloadLich(url = (typeof window !== 'undefined' && window.__LICH_URL) || 'assets/models/lich.glb') {
   return new Promise(res => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(url, gl => { try { cache = splitLich(gl.scene); } catch (e) { console.warn('lich split failed', e); } res(cache); }, undefined, e => { console.warn('lich glb load failed', e); res(null); }));
 }
 
@@ -81,7 +81,26 @@ export function applyLich(rig) {
   mk(armR, 'armR', PIVOT.armR); mk(armL, 'armL', PIVOT.armR, true);
   torso.clear(); torso.position.set(0, 1.0, 0);
   armR.add(hand); hand.position.set(0.08 * LICH_S, -0.04 * LICH_S, 0.05 * LICH_S);
-  if (rig.weapon) rig.weapon.scale.setScalar(0.6);
+  if (axeGeo) { hand.remove(rig.weapon); rig.weapon = makeAxe(); hand.add(rig.weapon); }
+  else if (rig.weapon) rig.weapon.scale.setScalar(0.6);
   body.add(legL, legR, torso, head, armL, armR);
   rig.headY = head.position.y;
+}
+
+// 큐트 도끼 glb: 자루 끝(아래)을 손 피벗에 두고 도끼날이 -y 로 향하게 뒤집는다 (절차적 도끼와 같은 방향).
+let axeGeo = null, axeMat = null;
+export function preloadAxe(url = (typeof window !== 'undefined' && window.__AXE_URL) || 'assets/models/axe.glb') {
+  return new Promise(res => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(url, gl => {
+    try {
+      let m; gl.scene.updateMatrixWorld(true); gl.scene.traverse(o => { if (o.isMesh) m = o; });
+      const g = m.geometry.clone(); g.applyMatrix4(m.matrixWorld); g.computeBoundingBox();
+      const b = g.boundingBox; g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.rotateZ(Math.PI);
+      axeGeo = g; axeMat = m.material;
+    } catch (e) { console.warn('axe failed', e); }
+    res(axeGeo);
+  }, undefined, e => { console.warn('axe load failed', e); res(null); }));
+}
+export function makeAxe() {
+  const mesh = new THREE.Mesh(axeGeo, axeMat.clone()); mesh.castShadow = true; mesh.scale.setScalar(1.25);
+  const g = new THREE.Group(); g.add(mesh); return g;
 }

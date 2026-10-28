@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { tex } from './tex.js';
 import { lichReady, applyLich } from './lichglb.js';
+import { sugarReady, applySugar } from './sugarglb.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
   color, roughness: o.r ?? .55, metalness: o.m ?? 0, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1, flatShading: o.flat ?? false,
@@ -97,6 +98,7 @@ export function buildCookie(def) {
     const wp = grp(); wp.add(cyl(.04, .04, 1.4, M(0x333344), 0, -.5, 0), sph(.2, M(def.color, { e: def.color, ei: 1.4 }), 0, -1.25, 0)); wp.rotation.x = -1.0; hand.add(wp); rig.weapon = wp;
   }
   if (id === 'lich' && lichReady()) { applyLich(rig); delete rig.extras['wing-1']; delete rig.extras['wing1']; }
+  if (id === 'sugar' && sugarReady()) applySugar(rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

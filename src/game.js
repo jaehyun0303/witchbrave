@@ -503,6 +503,7 @@ function animate(f, dt) {
   if (ex.crystals) ex.crystals.forEach((c, i) => { const a = c.userData.a + T * 1.6; c.position.set(Math.cos(a) * .9, 1.0 + Math.sin(T * 2 + i) * .25, Math.sin(a) * .9); c.rotation.y += dt * 3; });
   if (ex.halo) ex.halo.rotation.z += dt;
   if (ex['wing-1']) { const fl2 = Math.sin(T * 6) * .25; ex['wing-1'].rotation.z = -1.0 - fl2; ex['wing1'].rotation.z = 1.0 + fl2; }
+  if (ex.sugarWings) { const fl3 = Math.sin(T * 5) * .22; ex.sugarWings[0].rotation.z = fl3; ex.sugarWings[1].rotation.z = -fl3; ex.sugarTail.rotation.z = Math.sin(T * 3) * .35; }
   // 컷신 중 검 발광
   if (ex.bladeM) ex.bladeM.emissiveIntensity = 1.6 + f.cutGlow * 1.0 + (f.cast ? 1.0 : 0);
   // 액션 애니메이션

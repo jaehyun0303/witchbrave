@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { preloadLich } from './lichglb.js';
+import { preloadLich, preloadAxe } from './lichglb.js';
 import { buildCookie } from './models.js';
 
 const r = new THREE.WebGLRenderer({ antialias: true });
@@ -16,7 +16,7 @@ const ctl = new OrbitControls(cam, r.domElement);
 ctl.target.set(0, 1.1, 0);
 const q = new URLSearchParams(location.search), pose = q.get('pose') || 'idle';
 let rig;
-preloadLich().then(() => {
+Promise.all([preloadLich(), preloadAxe()]).then(() => {
   rig = buildCookie({ id: 'lich', color: 0xc46bff });
   scene.add(rig.root); window.__rig = rig; window.__done = true;
 });

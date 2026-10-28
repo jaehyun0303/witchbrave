@@ -1,3 +1,4 @@
 import { init } from './game.js';
-import { preloadLich } from './lichglb.js';
-preloadLich().then(init);
+import { preloadLich, preloadAxe } from './lichglb.js';
+import { preloadSugar } from './sugarglb.js';
+Promise.all([preloadLich(), preloadSugar(), preloadAxe()]).then(init);

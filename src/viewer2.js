@@ -1,0 +1,12 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8a93a8);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100); cam.position.set(0, 0.6, 2.2);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(2, 3, 4); scene.add(d);
+const ctl = new OrbitControls(cam, r.domElement); ctl.target.set(0, 0.5, 0);
+const m = new URLSearchParams(location.search).get('m') || 'sugar';
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load('assets/models/' + m + '.glb', g => { scene.add(g.scene); window.__scene = g.scene; const s = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3()); document.title = s.toArray().map(v => v.toFixed(2)).join('x'); });
+r.setAnimationLoop(() => { ctl.update(); r.render(scene, cam); });
