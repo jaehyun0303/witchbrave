@@ -106,6 +106,10 @@ export function createWorld(canvas) {
       scene.fog.color.set(on ? 0x3a0a40 : 0x120a2a);
       bloom.strength = on ? .9 : .6;
     },
+    setParadise(on) {
+      floor.material.color.set(on ? 0xffc9e8 : 0x7a72b8); scene.fog.color.set(on ? 0xf4b8dc : 0x120a2a); scene.fog.density = on ? .005 : .0085;
+      hemi.color.set(on ? 0xffd6f0 : 0x8c88ff);
+    },
     setCut(on) {
       moonL.intensity = on ? .35 : 1.25; hemi.intensity = on ? .25 : .6; renderer.toneMappingExposure = on ? .9 : 1.05;
       scene.fog.density = on ? .0025 : .0085;

@@ -1,8 +1,7 @@
 // 이터널슈가 쿠키 glb(정적 단일 메시)를 부위별로 나눠 buildCookie 의 rig 에 맞춘다.
 // 모델 좌표: 높이 0~0.87, 정면 +z. 좌우 대칭이라 x<0 을 L, x>0 을 R 로 둔다.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { loadGLB } from './glbload.js';
 
 export const SUGAR_S = 2.4;
 export const CUT = { wingX: 0.22, tailY: 0.2, tailX0: -0.14, tailX1: -0.025, tailZ: 9, legY: 0.28, legX: 0.1, armX0: 0.04, armX1: 0.13, armY0: 0.29, armY1: 0.42, armZ0: 0.0 };
@@ -50,7 +49,7 @@ export function splitSugar(gltfScene) {
 let cache = null;
 export const sugarReady = () => cache;
 export function preloadSugar(url = (typeof window !== 'undefined' && window.__SUGAR_URL) || 'assets/models/sugar.glb') {
-  return new Promise(res => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(url, gl => { try { cache = splitSugar(gl.scene); } catch (e) { console.warn('sugar split failed', e); } res(cache); }, undefined, e => { console.warn('sugar glb load failed', e); res(null); }));
+  return new Promise(res => loadGLB(url, gl => { try { cache = splitSugar(gl.scene); } catch (e) { console.warn('sugar split failed', e); } res(cache); }, e => { console.warn('sugar glb load failed', e); res(null); }));
 }
 
 function partGroup(name) {

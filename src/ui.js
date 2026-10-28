@@ -52,11 +52,11 @@ export function beginBattle(B) {
     const mine = f.ctrl.kind === 'h1' || (f.ctrl.kind === 'h2' && B.mode === 'local');
     const p = document.createElement('div'); p.className = 'panel ' + (i ? 'right' : 'left');
     p.innerHTML = `<div class="pname" style="color:${hex(f.def.color)}">${f.def.name}<span class="form"></span></div>
-      <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><span class="hptxt"></span></div>
+      <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><div class="shfill"></div><span class="hptxt"></span></div>
       ${mine ? `<div class="skills">${['z', 'x', 'c', 'v'].map((k, j) => `<div class="slot" data-k="${k}"><i>${keys[j]}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
     root.appendChild(p);
     const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="mini"><div></div></div><div class="ic"></div>'; root.appendChild(tag);
-    hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
+    hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), sh: p.querySelector('.shfill'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
     hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic') });
   });
 }
@@ -67,7 +67,8 @@ export function update(B, camera, renderer, dt) {
   for (const p of hud.panels) {
     const f = p.f, r = Math.max(0, f.hp / f.max);
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
-    p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString();
+    p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
+    if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
     p.form.textContent = f.form === 'dragon' ? ' [용]' : '';
     p.slots.forEach(s => {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];

@@ -1,8 +1,7 @@
 // 리치드래곤 쿠키 glb(정적 단일 메시)를 부위별로 나눠 buildCookie의 rig에 맞춘다.
 // 모델 좌표: 높이 0~0.98, 정면 +z, 캐릭터 오른팔이 +x. 왼팔은 없어서 오른팔을 좌우 반전해서 만든다.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { loadGLB } from './glbload.js';
 
 export const LICH_S = 2.3;
 // 부위 경계 (모델 좌표). viewer 로 색칠해 보며 조정한다.
@@ -59,7 +58,7 @@ export function splitLich(gltfScene) {
 let cache = null;
 export function lichReady() { return cache; }
 export function preloadLich(url = (typeof window !== 'undefined' && window.__LICH_URL) || 'assets/models/lich.glb') {
-  return new Promise(res => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(url, gl => { try { cache = splitLich(gl.scene); } catch (e) { console.warn('lich split failed', e); } res(cache); }, undefined, e => { console.warn('lich glb load failed', e); res(null); }));
+  return new Promise(res => loadGLB(url, gl => { try { cache = splitLich(gl.scene); } catch (e) { console.warn('lich split failed', e); } res(cache); }, e => { console.warn('lich glb load failed', e); res(null); }));
 }
 
 // buildCookie 가 쓰는 부위 mesh 를 만든다: 피벗 그룹 + 안쪽 mesh.
@@ -81,24 +80,24 @@ export function applyLich(rig) {
   mk(armR, 'armR', PIVOT.armR); mk(armL, 'armL', PIVOT.armR, true);
   torso.clear(); torso.position.set(0, 1.0, 0);
   armR.add(hand); hand.position.set(0.08 * LICH_S, -0.04 * LICH_S, 0.05 * LICH_S);
-  if (axeGeo) { hand.remove(rig.weapon); rig.weapon = makeAxe(); hand.add(rig.weapon); }
+  if (axeGeo) { hand.remove(rig.weapon); rig.weapon = makeAxe(); head.add(rig.weapon); rig.weapon.position.set(0.4 * LICH_S, (0.27 - 0.5) * LICH_S, 0.06 * LICH_S); }
   else if (rig.weapon) rig.weapon.scale.setScalar(0.6);
   body.add(legL, legR, torso, head, armL, armR);
   rig.headY = head.position.y;
 }
 
-// 큐트 도끼 glb: 자루 끝(아래)을 손 피벗에 두고 도끼날이 -y 로 향하게 뒤집는다 (절차적 도끼와 같은 방향).
+// 큐트 도끼 glb: 자루 아래쪽 30% 지점을 쥐는 피벗으로 두고 도끼날이 위로 향하게 세운다.
 let axeGeo = null, axeMat = null;
 export function preloadAxe(url = (typeof window !== 'undefined' && window.__AXE_URL) || 'assets/models/axe.glb') {
-  return new Promise(res => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(url, gl => {
+  return new Promise(res => loadGLB(url, gl => {
     try {
       let m; gl.scene.updateMatrixWorld(true); gl.scene.traverse(o => { if (o.isMesh) m = o; });
       const g = m.geometry.clone(); g.applyMatrix4(m.matrixWorld); g.computeBoundingBox();
-      const b = g.boundingBox; g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.rotateZ(Math.PI);
+      const b = g.boundingBox; g.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + (b.max.y - b.min.y) * 0.3), -(b.min.z + b.max.z) / 2);
       axeGeo = g; axeMat = m.material;
     } catch (e) { console.warn('axe failed', e); }
     res(axeGeo);
-  }, undefined, e => { console.warn('axe load failed', e); res(null); }));
+  }, e => { console.warn('axe load failed', e); res(null); }));
 }
 export function makeAxe() {
   const mesh = new THREE.Mesh(axeGeo, axeMat.clone()); mesh.castShadow = true; mesh.scale.setScalar(1.25);
