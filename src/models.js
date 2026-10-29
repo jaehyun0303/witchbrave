@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { tex } from './tex.js';
 import { lichReady, applyLich } from './lichglb.js';
 import { sugarReady, applySugar } from './sugarglb.js';
+import { dragonReady, buildDragonGLB } from './dragonglb.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
   color, roughness: o.r ?? .55, metalness: o.m ?? 0, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1, flatShading: o.flat ?? false,
@@ -105,6 +106,7 @@ export function buildCookie(def) {
 
 /* ================= 리치드래곤 (뼈 용) ================= */
 export function buildDragon() {
+  if (dragonReady()) return buildDragonGLB();
   const root = grp(), body = grp(); root.add(body); const S = 2.2; body.scale.setScalar(S);
   const bone = M(0xe9e2d0, { r: .6 }), boneD = M(0xb9b09a, { r: .7 }), purple = M(0x7a2bd0, { e: 0xa040ff, ei: 1.6 }), flame = new THREE.MeshBasicMaterial({ color: 0xd066ff });
   const spine = grp(0, 1.0, 0); body.add(spine);

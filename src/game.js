@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { VFX, ease } from './vfx.js';
 import { buildCookie, buildDragon, buildMoon, heartMesh } from './models.js';
+import { poseBone } from './dragonglb.js';
 import { tex, loadManifest } from './tex.js';
 import * as ui from './ui.js';
 
@@ -75,6 +76,9 @@ function projVisual(p) {
     const m2 = m.clone(); m2.material = m.material.clone(); m2.material.color.set(p.color); m2.scale.multiplyScalar(1.25); g.add(m2);
   } else if (p.kind === 'heart') {
     const h = heartMesh(new THREE.MeshStandardMaterial({ color: 0xff6adf, emissive: 0xff2ac0, emissiveIntensity: 1.6, roughness: .3 }), .85); g.add(h); g.userData.mesh = h;
+  } else if (p.kind === 'orb') {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(p.r * S * 1.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a3a })); g.add(m); g.userData.mesh = m;
+    const m2 = new THREE.Mesh(new THREE.SphereGeometry(p.r * S * .7, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffd0d0 })); g.add(m2); glow.scale.setScalar(p.r * S * 12);
   } else if (p.kind === 'beam') {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: p.color, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     m.scale.set(p.r * S * 1.6, p.r * S * 1.6, 9); g.add(m); glow.scale.setScalar(p.r * S * 14);
@@ -92,6 +96,7 @@ function shoot(f, o) {
 function killProj(p) { p.life = 0; if (p.vis) { world.scene.remove(p.vis); p.vis.traverse(o => { if (o.material) o.material.dispose(); }); p.vis = null; } }
 function updProjs(dt) {
   for (const p of B.projs) {
+    if (p.homing) { const t = foe(p.owner); if (t.hp > 0 && Math.hypot(t.x - p.x, t.y - p.y) < p.homing) { const want = Math.atan2(t.y - p.y, t.x - p.x), cur = Math.atan2(p.vy, p.vx), d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur)), na = cur + clamp(d, -p.turn * dt, p.turn * dt), sp = Math.hypot(p.vx, p.vy); p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp; } }
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
     if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) p.life = 0;
     const wp = W3(p.x, p.y, 1.2);
@@ -126,6 +131,7 @@ function zone(f, o) {
   const c = P3(z);
   z.tele = vfx.decal(c, { tex: 'rune', r: z.r * S, color: z.color, alpha: .9, spin: 1.5 });
   z.tele2 = vfx.decal(c, { tex: 'ring', r: z.r * S * 1.05, color: z.color, alpha: .8, y: .07 });
+  if (z.fancy) z.tele3 = vfx.decal(c, { tex: 'rune', r: z.r * S * .62, color: 0xff8080, alpha: .85, spin: -3, y: .06 });
   if (z.rock) { z.mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(.9, 0), new THREE.MeshStandardMaterial({ color: 0xff9ad8, emissive: 0xff4fb0, emissiveIntensity: .9, flatShading: true })); z.mesh.scale.set(1, 1.4, 1); z.mesh.position.set(c.x, 22, c.z); world.scene.add(z.mesh); }
   B.zones.push(z);
 }
@@ -151,12 +157,14 @@ function updZones(dt) {
     if (z.mesh) { z.mesh.position.y = lerp(22, .6, u * u); z.mesh.rotation.y += dt * 6; }
     if (!z.done) { // 예고선: 점점 선명해지고 안쪽에서 입자 모임
       z.tele.obj.material.opacity = .25 + u * .7; z.tele2.obj.scale.setScalar(z.r * S * 2.1 * (1.15 - u * .15));
+      if (z.fancy) { const c = P3(z); for (let i = 0; i < 3; i++) { const a = rnd(0, 6.283), d = Math.sqrt(Math.random()) * z.r * S; vfx.emit('glow', { x: c.x + Math.cos(a) * d, y: .3, z: c.z + Math.sin(a) * d, vy: rnd(2, 7), life: rnd(.6, 1), s0: rnd(.5, 1), s1: .15, c0: 0xff5060, c1: 0x800010, a: .95, drag: 0 }); } }
       if (Math.random() < .8) { const a = rnd(0, 6.283), c = P3(z); vfx.emit('glow', { x: c.x + Math.cos(a) * z.r * S, y: .1, z: c.z + Math.sin(a) * z.r * S, vx: -Math.cos(a) * 3, vy: rnd(1, 4), vz: -Math.sin(a) * 3, life: .35, s0: .45, s1: 0, c0: z.color, drag: 0 }); }
     }
     if (!z.done && z.t >= z.delay) {
-      z.done = true; vfx.remove(z.tele); vfx.remove(z.tele2);
+      z.done = true; vfx.remove(z.tele); vfx.remove(z.tele2); if (z.tele3) vfx.remove(z.tele3);
       if (z.mesh) { world.scene.remove(z.mesh); z.mesh = null; const c = P3(z); vfx.ring(c, { r0: .3, r1: z.r * S * 1.8, dur: .4, color: z.color }); vfx.burst('spark', c.clone().setY(.4), 22, { speed: 5, speed2: 11, life: .5, size: .4, c0: 0xffffff, c1: z.color, grav: 8 }); vfx.flash(c.clone().setY(.8), { size: 3.2, color: z.color, dur: .25, grow: true }); shake(.2, .15); }
       else erupt(P3(z), z.r * S, z.color);
+      if (z.fancy) { const c = P3(z); erupt(c, z.r * S * 1.4, z.color, 22); erupt(c, z.r * S * .8, 0xffffff, 28); for (let i = 0; i < 3; i++) vfx.ring(c, { r0: .5, r1: z.r * S * (2 + i), dur: .6 + i * .2, color: i ? 0xff8080 : 0xff2438 }); vfx.burst('spark', c.clone().setY(1), 120, { speed: 8, speed2: 26, life: .9, life2: 1.8, size: .8, c0: 0xffffff, c1: 0xff2030, grav: 5 }); ui.flash('#ff2030', .5, .4); shake(.9, .5); }
       for (const t of B.fighters) if (t !== z.owner && Math.hypot(t.x - z.x, t.y - z.y) < z.r + t.r) { hurt(z.owner, t, z.dmg); z.onHit && z.onHit(t); }
     }
   }
@@ -555,7 +563,74 @@ function updAngels(dt) {
   }
   B.angels = B.angels.filter(a => { if (a.life <= 0) { world.scene.remove(a.g); vfx.burst('glow', W3(a.x, a.y, 2.4), 14, { speed: 3, life: .6, size: .6, c0: 0xffffff, c1: 0xffb3e6 }); return false; } return true; });
 }
-CHARS.dark = placeholder('dark', '어둠마녀 쿠키', 0x8a2be2, 600, 25000, '어둠 마법');
+CHARS.dark = {
+  id: 'dark', name: '어둠마녀 쿠키', color: 0xd8202f, cost: 600, hp: 24000, witch: { hp: 60000 }, pref: 5.5, atkRange: 520, tag: '유도 · 흡수 · 변신',
+  skills: {
+    base: {
+      a: { name: '핏빛 구체', cd: .5, desc: '시뻘건 유도 마법구체를 발사. 범위 안에서만 유도. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 500, r: 12, dmg: 120, color: 0xff2438, kind: 'orb', life: 1.8, homing: 340, turn: 3.6 }); } },
+      z: { name: '진홍의 마법진', cd: 9, desc: '붉은 마법진을 소환하고 구체가 솟구친 뒤 대폭발. 데미지 2500, 적중 시 2초간 스킬 쿨타임이 줄지 않음', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 600); zone(f, { x: q.x, y: q.y, r: 140, delay: 1, dmg: 2500, color: 0xff2438, fancy: true, onHit: t => { t.st.cdfreeze = 2; ui.pop(P3(t, 3.4), '⏳ 쿨타임 정지', '#ff8a8a'); } }); } },
+      x: { name: '에너지 흡수진', cd: 20, desc: '붉은 흡수 마법진 소환. 10초간 초당 약 500의 피를 흡수. 기절·넉백을 맞으면 해제', use(f) { if (f.drain) return false; startDrain(f); } },
+      c: { name: '광역 폭발 마법', cd: 22, desc: '넓은 범위에 붉은 폭발 마법이 무작위로 연속 폭발. 폭발당 700', use(f) { startRandomBlast(f); } },
+      v: { name: '어둠마녀 변신', cd: 40, desc: '25초간 어둠마녀로 변신하고 스킬이 달라짐 (변신 후 스킬은 임시)', use(f) { transformWitch(f); return 'nocd'; } },
+    },
+    witch: {    // ※ 변신 후 스킬은 임시 스펙입니다 (스펙 전달받으면 교체)
+      a: { name: '핏빛 삼연구', cd: .6, desc: '(임시) 유도 구체 3발. 각 150', use(f) { setAnim(f, 'cast', .25); for (const d of [-.25, 0, .25]) shoot(f, { a: f.face + d, sp: 520, r: 12, dmg: 150, color: 0xff2438, kind: 'orb', life: 1.8, homing: 380, turn: 3.6 }); } },
+      z: { name: '진홍 대폭발', cd: 8, desc: '(임시) 지정 위치 대폭발 3500', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 650); zone(f, { x: q.x, y: q.y, r: 170, delay: .9, dmg: 3500, color: 0xff2438, fancy: true }); } },
+      x: { name: '피의 광선', cd: 10, desc: '(임시) 관통 광선 2200', use(f) { setAnim(f, 'breath', .7); shoot(f, { a: f.face, sp: 900, r: 40, dmg: 2200, pierce: true, color: 0xff1a2a, kind: 'beam', life: 1.1 }); shake(.5, .4); } },
+      c: { name: '핏빛 폭풍', cd: 20, desc: '(임시) 폭발 마법 연속 폭발', use(f) { startRandomBlast(f, 1.5); } },
+      v: { name: '변신 해제', cd: 1, desc: '변신을 해제', use(f) { revertForm(f); f.cd.v = 40; } },
+    }
+  }
+};
+
+/* ===== 어둠마녀 ===== */
+function startRandomBlast(f, mul = 1) {
+  const e = foe(f), steps = []; setAnim(f, 'cast', .8);
+  vfx.ring(P3(f), { r0: .5, r1: 8, dur: .6, color: 0xff2438 }); ui.flash('#ff2030', .3, .3);
+  for (let i = 0; i < Math.round(12 * mul); i++) steps.push({
+    at: .4 + i * .2, fn: () => {
+      const near = Math.random() < .5, x = near ? clamp(e.x + rnd(-260, 260), PAD, W - PAD) : rnd(PAD, W - PAD), y = near ? clamp(e.y + rnd(-200, 200), PAD, H - PAD) : rnd(PAD, H - PAD);
+      zone(f, { x, y, r: 105, delay: .7, dmg: 700, color: 0xff2438 });
+    }
+  });
+  runScript(f, steps, 3, null);
+}
+function startDrain(f) {
+  const R = 300, d = f.drain = { t: 0, dur: 10, r: R, acc: 0, fx: 0 };
+  d.rune = vfx.decal(P3(f), { tex: 'rune', r: R * S, color: 0xff2438, alpha: .85, spin: .6 });
+  d.rune2 = vfx.decal(P3(f), { tex: 'rune', r: R * S * .6, color: 0xff8080, alpha: .6, spin: -1.2, y: .06 });
+  d.ring = vfx.decal(P3(f), { tex: 'ring', r: R * S, color: 0xffffff, alpha: .8, y: .07 });
+  vfx.ring(P3(f), { r0: .5, r1: R * S * 1.2, dur: .6, color: 0xff2438 }); ui.flash('#ff2030', .3, .3); setAnim(f, 'cast', .4); toast(f, '에너지 흡수 시작');
+}
+function endDrain(f, broken) {
+  const d = f.drain; if (!d) return; f.drain = null;
+  [d.rune, d.rune2, d.ring].forEach(i => vfx.remove(i));
+  vfx.ring(P3(f), { r0: 1, r1: 6, dur: .5, color: 0xff8080 });
+  if (broken) { ui.pop(P3(f, 3.4), '흡수 해제!', '#ff8a8a'); toast(f, '흡수 해제!'); }
+}
+function updDrain(f, dt) {
+  const d = f.drain; d.t += dt;
+  if (f.st.stun > 0 || f.st.knock > 0) { endDrain(f, true); return; }
+  if (d.t >= d.dur) { endDrain(f, false); return; }
+  const p = P3(f);
+  for (const it of [d.rune, d.rune2, d.ring]) { it.obj.position.x = p.x; it.obj.position.z = p.z; }
+  const e = foe(f);
+  if (e.hp > 0 && Math.hypot(e.x - f.x, e.y - f.y) < d.r + e.r) {
+    const amt = 500 * dt; hurt(f, e, amt, { quiet: true, field: true });
+    f.hp = Math.min(f.max, f.hp + amt * dmgMul(f)); d.acc += amt;
+    d.fx -= dt; if (d.fx <= 0) { d.fx = .12; vfx.line('glow', P3(e, 1.5), P3(f, 1.5), 7, { size: .6, size1: .1, c0: 0xff4050, c1: 0x800010, life: .7, rad: .4, v: 1 }); }
+    if (d.acc >= 500) { d.acc -= 500; ui.pop(P3(e, 2.6), '-500', '#ff6a78'); ui.pop(P3(f, 2.6), '+500', '#7dff9b'); }
+  }
+  if (Math.random() < .6) { const a = rnd(0, 6.283); vfx.emit('glow', { x: p.x + Math.cos(a) * d.r * S, y: .2, z: p.z + Math.sin(a) * d.r * S, vx: -Math.cos(a) * 2, vy: rnd(1, 3), vz: -Math.sin(a) * 2, life: 1, s0: .5, s1: 0, c0: 0xff4050, a: .8, drag: 0 }); }
+}
+function transformWitch(f) {
+  setAnim(f, 'cast', 1); const p = P3(f), ratio = f.hp / f.max; f.form = 'witch'; f.formT = 25; f.max = 60000; f.hp = ratio * 60000;
+  for (const k in f.cd) f.cd[k] = 0; f.cd.v = 0;
+  for (let i = 0; i < 4; i++) vfx.ring(p, { r0: 1, r1: 8 + i * 4, dur: .6 + i * .2, color: i % 2 ? 0xffffff : 0xff2438 });
+  vfx.column(p, { r: 3, h: 36, dur: 1.1, color: 0xff2438 }); vfx.column(p, { r: 1.6, h: 36, dur: .9, color: 0xffffff });
+  vfx.burst('spark', P3(f, 2), 120, { speed: 8, speed2: 28, life: .9, life2: 1.8, size: 1, c0: 0xffffff, c1: 0xff2030, grav: 3 });
+  vfx.decal(p, { tex: 'rune', r: 6, color: 0xff2438, dur: 1.5, alpha: 1, spin: 3 }); shake(1, .7); ui.flash('#ff2030', .7, .45);
+}
 const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark'];
 
 /* ===== 리치드래곤 변신 ===== */
@@ -587,7 +662,7 @@ function revertForm(f) {
 function mkFighter(def, x, y, ctrl) {
   const f = {
     def, x, y, r: 22, hp: def.hp, max: def.hp, face: 0, form: 'base', formT: 0,
-    cd: { a: 0, z: 0, x: 0, c: 0, v: 0 }, st: { slow: 0, slowF: 1, silence: 0, stun: 0, charm: 0, inv: 0, lock: 0 },
+    cd: { a: 0, z: 0, x: 0, c: 0, v: 0 }, st: { slow: 0, slowF: 1, silence: 0, stun: 0, charm: 0, inv: 0, lock: 0, cdfreeze: 0, knock: 0 },
     cast: null, script: null, awake: ctrl.kind === 'ai' || SAVE.awake.includes(def.id), ctrl, ai: { t: 0, strafe: 1 }, flash: 0, mindBuff: false,
     shield: def.shield || 0, shieldMax: def.shield || 0, drT: 0, drV: 0, anim: null, pose: null, at: Math.random() * 10, yaw: 0, vel: 0, cutGlow: 0, dragonPop: 1,
   };
@@ -605,6 +680,7 @@ function removeFighter(f) { world.scene.remove(f.root); }
 const rot = (o, x, y, z) => o.rotation.set(x, y, z);
 function animate(f, dt) {
   f.at += dt;
+  if (f.def.id === 'dark') f.root.scale.setScalar(lerp(f.root.scale.x, f.form === 'witch' ? 1.3 : 1, .15));
   const T = f.at, dead = f.hp <= 0, dragon = f.form === 'dragon';
   // 위치/방향
   const tp = W3(f.x, f.y, 0);
@@ -621,7 +697,7 @@ function animate(f, dt) {
   // 애니메이션 진행
   let ap = 0, an = null; if (f.anim) { f.anim.t += dt; ap = Math.min(1, f.anim.t / f.anim.d); an = f.anim.n; if (ap >= 1) f.anim = null; }
   const mv = f.vel, run = Math.min(1, mv / 3);
-  if (dragon) return animDragon(f, dt, T, an, ap, run, dead);
+  if (dragon) return f.drg.glb ? animDragonGLB(f, dt, T, an, ap, run, dead) : animDragon(f, dt, T, an, ap, run, dead);
   const R = f.rig, bob = Math.sin(T * 3) * .03;
   R.body.position.y = bob + Math.abs(Math.sin(T * 12)) * .06 * run; R.body.rotation.set(run * .12, 0, 0);
   R.legL.rotation.x = Math.sin(T * 12) * .8 * run; R.legR.rotation.x = -Math.sin(T * 12) * .8 * run;
@@ -662,6 +738,17 @@ function animate(f, dt) {
   if (f.st.inv > 0) R.root.visible = Math.floor(T * 40) % 2 === 0 || !!f.script;
   if (dead) { f.deadT = (f.deadT || 0) + dt; const u = Math.min(1, f.deadT * 1.6); f.root.rotation.z = u * Math.PI / 2; f.root.position.y = -u * .35; R.body.rotation.x = 0; R.root.visible = true; }
   if (!f.mindBuff) { /* noop */ } else if (Math.random() < .25) vfx.emit('glow', { x: f.root.position.x + rnd(-.7, .7), y: .1, z: f.root.position.z + rnd(-.7, .7), vy: 2.5, life: .8, s0: .5, s1: 0, c0: 0xff7ae0, a: .7 });
+}
+function animDragonGLB(f, dt, T, an, ap, run, dead) {
+  const D = f.drg, fl = Math.sin(T * 5) * .35 + (an === 'roar' ? .6 : an === 'breath' ? .2 : 0), st = Math.sin(T * 9) * .5 * run;
+  D.body.position.y = D.body.userData.y0 + Math.sin(T * 2) * .12; D.body.rotation.x = run * .05;
+  poseBone(D, 'L_Upperarm', 0, 0, fl * .9 - .1); poseBone(D, 'R_Upperarm', 0, 0, fl * .9 - .1);
+  poseBone(D, 'L_Thigh', st, 0, 0); poseBone(D, 'R_Thigh', -st, 0, 0);
+  poseBone(D, 'Head', an === 'roar' ? -.5 * Math.sin(ap * Math.PI) : an === 'breath' ? -.25 * Math.sin(ap * Math.PI) : 0, 0, 0);
+  poseBone(D, 'Spine02', 0, an === 'tail' ? Math.sin(ap * Math.PI * 2) * 1.0 : Math.sin(T * 2.4) * .05, 0);
+  if (Math.random() < .4) vfx.emit('glow', { x: f.root.position.x + rnd(-1.5, 1.5), y: rnd(.5, 3), z: f.root.position.z + rnd(-1.5, 1.5), vy: 3, life: .9, s0: .8, s1: 0, c0: 0xd066ff, c1: 0x3a1060, a: .8 });
+  if (Math.random() < .5) { const h = D.head.getWorldPosition(new THREE.Vector3()); vfx.emit('glow', { x: h.x, y: h.y + .2, z: h.z, vy: 1.5, life: .6, s0: .5, s1: 0, c0: 0xe08aff }); }
+  if (dead) { f.deadT = (f.deadT || 0) + dt; const u = Math.min(1, f.deadT * 1.2); f.root.rotation.z = u * .6; f.root.position.y = -u * .8; }
 }
 function animDragon(f, dt, T, an, ap, run, dead) {
   const D = f.drg, fl = Math.sin(T * 5) * .35;
@@ -720,7 +807,7 @@ function aiInput(f) {
   for (const k of ['z', 'x', 'c', 'v']) {
     if (f.cd[k] > 0 || Math.random() > dt * .9) continue;
     if (k === 'v' && f.def.id === 'silent' && d > 250) continue;
-    if (k === 'v' && f.form === 'dragon') continue;
+    if (k === 'v' && f.form !== 'base') continue;
     if (k === 'v' && f.cast) continue;
     if (f.def.id === 'sugar' && (k === 'c' || k === 'v') && f.hp / f.max > .7 && f.shield / f.shieldMax > .6) continue;
     inp.keys.push(k);
@@ -746,10 +833,10 @@ function tryUse(f, k) {
 
 /* ================= 업데이트 ================= */
 function updFighter(f, dt) {
-  for (const k in f.cd) f.cd[k] = Math.max(0, f.cd[k] - dt);
-  for (const k of ['slow', 'silence', 'stun', 'charm', 'inv', 'lock']) f.st[k] = Math.max(0, f.st[k] - dt);
+  if (!(f.st.cdfreeze > 0)) for (const k in f.cd) f.cd[k] = Math.max(0, f.cd[k] - dt);
+  for (const k of ['slow', 'silence', 'stun', 'charm', 'inv', 'lock', 'cdfreeze', 'knock']) f.st[k] = Math.max(0, f.st[k] - dt);
   f.flash = Math.max(0, f.flash - dt); f.drT = Math.max(0, f.drT - dt);
-  if (f.form === 'dragon' && !f.script) { f.formT -= dt; if (f.formT <= 0) { revertForm(f); toast(f, '변신 종료'); } }
+  if (f.form !== 'base' && !f.script) { f.formT -= dt; if (f.formT <= 0) { revertForm(f); toast(f, '변신 종료'); } }
   const inp = readInput(f), ap = aimPoint(f);
   if (!f.script && f.st.stun <= 0 && f.st.lock <= 0) f.face = ang(f, ap);
   if (f.script) { const s = f.script; s.t += dt; for (const st of s.steps) if (!st.d && s.t >= st.at) { st.d = true; st.fn(); } if (s.t >= s.end) { f.script = null; s.onEnd && s.onEnd(); } }
@@ -757,6 +844,7 @@ function updFighter(f, dt) {
   if (canAct) { for (const k of inp.keys) tryUse(f, k); if (inp.a && !f.cast) tryUse(f, 'a'); }
   if (f.cast && f.cast.type === 'field') updField(f, dt);
   if (f.cast && f.cast.type === 'sleep') updSleep(f, dt);
+  if (f.drain) updDrain(f, dt);
   if (f.cast && f.cast.type === 'paradise') updParadise(f, dt);
   const ox = f.x, oy = f.y;
   if (canAct && !f.cast) {
@@ -832,7 +920,7 @@ export function startBattle(p1, p2, mode) {
 }
 function cleanup() {
   if (!B) return;
-  B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
+  B.fighters.forEach(f => { if (f.drain) endDrain(f); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
   B.lakes.forEach(removeLake); B.angels.forEach(a => world.scene.remove(a.g)); B.zones.forEach(z => z.mesh && world.scene.remove(z.mesh));
   B.fighters.forEach(f => { if (f.cast && f.cast.group) world.scene.remove(f.cast.group); }); world.setParadise(false);
   if (B.cut) world.scene.remove(B.cut.moon.group);

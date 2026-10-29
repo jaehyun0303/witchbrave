@@ -23,7 +23,7 @@ export function buildMenu() {
     const d = document.createElement('div'); d.className = 'card' + (api.picked() === id ? ' sel' : '') + (un ? '' : ' locked');
     d.innerHTML = `<div class="name" style="color:${hex(c.color)}">${un ? '' : '🔒 '}${c.name}</div><div class="tag">HP ${c.hp.toLocaleString()} · ${c.tag}</div>` +
       ['a', 'z', 'x', 'c', 'v'].map(k => `<div class="sk${c.tmp ? ' tmp' : ''}"><b>${k === 'a' ? '평타' : k.toUpperCase()} ${sk[k].name}</b> — ${sk[k].desc}</div>`).join('') +
-      (c.dragon ? `<div class="sk"><b>변신 HP</b> ${c.dragon.hp.toLocaleString()}</div>` : '');
+      ((c.dragon || c.witch) ? `<div class="sk"><b>변신 HP</b> ${(c.dragon || c.witch).hp.toLocaleString()}</div>` : '');
     const b = document.createElement('button'); b.style.marginTop = '8px';
     if (un) { b.textContent = api.picked() === id ? '선택됨' : '선택'; b.disabled = api.picked() === id; b.onclick = () => { api.pick(id); buildMenu(); }; }
     else { b.textContent = `해금 (${c.cost} 코인)`; b.disabled = SAVE.coins < c.cost; b.onclick = () => { SAVE.coins -= c.cost; SAVE.unlocked.push(id); api.persist(); buildMenu(); }; }
@@ -69,7 +69,7 @@ export function update(B, camera, renderer, dt) {
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
     p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
-    p.form.textContent = f.form === 'dragon' ? ' [용]' : '';
+    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : '';
     p.slots.forEach(s => {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
@@ -84,7 +84,7 @@ export function update(B, camera, renderer, dt) {
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
     let ic = ''; const s = f.st;
-    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓';
+    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳';
     t.ic.textContent = ic;
   }
   for (let i = pops.length - 1; i >= 0; i--) {
