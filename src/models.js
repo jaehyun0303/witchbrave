@@ -4,6 +4,7 @@ import { tex } from './tex.js';
 import { lichReady, applyLich } from './lichglb.js';
 import { sugarReady, applySugar } from './sugarglb.js';
 import { dragonReady, buildDragonGLB } from './dragonglb.js';
+import { darkReady, applyDark } from './darkglb.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
   color, roughness: o.r ?? .55, metalness: o.m ?? 0, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1, flatShading: o.flat ?? false,
@@ -100,6 +101,7 @@ export function buildCookie(def) {
   }
   if (id === 'lich' && lichReady()) { applyLich(rig); delete rig.extras['wing-1']; delete rig.extras['wing1']; }
   if (id === 'sugar' && sugarReady()) applySugar(rig);
+  if (id === 'dark' && darkReady()) applyDark(rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

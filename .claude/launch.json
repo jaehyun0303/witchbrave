@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "witchbrave", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "C:/Users/admin/Desktop/witchbrave", "run", "dev"], "port": 8080 }
+    { "name": "witchbrave", "runtimeExecutable": "node", "runtimeArgs": ["C:/Users/admin/Desktop/witchbrave/scripts/dev.cjs"], "port": 8080 }
   ]
 }
