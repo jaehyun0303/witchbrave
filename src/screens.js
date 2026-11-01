@@ -249,7 +249,7 @@ build.chars = art => {
     card.style.left = 22 + 166 * (i % 4) + 'px'; card.style.top = 20 + 188 * Math.floor(i / 4) + 'px'; stripe(card, mt.rar);
     if (!un) {
       setText(card, '전설', mt.rar); setText(card, 'CHARACTER 07', c.name); const bar = card.querySelector('span[style*="width:118px"]');
-      if (bar) { bar.outerHTML = `<span style="position:absolute;left:0;top:150px;width:146px;text-align:center;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px;line-height:16px;color:#4d3a55">${fmt(c.cost)} 코인으로 해금</span>`; }
+      if (bar) { bar.outerHTML = `<span style="position:absolute;left:0;top:150px;width:146px;text-align:center;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px;line-height:16px;color:#4d3a55">뽑기에서만 획득</span>`; }
       card.setAttribute('aria-label', c.name + ' 잠김');
     } else {
       setText(card, picked ? 'Lv 9' : 'Lv 7', 'Lv ' + charLv(id)); setText(card, picked ? 'CHARACTER 01' : 'CHARACTER 02', c.name);
@@ -271,8 +271,8 @@ build.chars = art => {
   const sks = sk.r ? sk.r.name : sk.v.name; setText(right, '3연발 사격', sk.a.name); setText(right, '방패 돌진', sk.z.name + ' · ' + sk.x.name); setText(right, '광역 충격파', sks);
   const bs = [...right.querySelectorAll(':scope>button')], bSkin = bs[0], bUp = bs[1], bSel = bs[2];
   bSkin.onclick = soon; bUp.onclick = soon;
-  bSel.textContent = un ? (api.picked() === id ? '선택중' : '선택') : `해금 ${fmt(c.cost)}`;
-  bSel.onclick = () => { if (un) { api.pick(id); toast(c.name + ' 선택!'); open('chars'); } else if (SAVE.coins >= c.cost) { SAVE.coins -= c.cost; SAVE.unlocked.push(id); api.persist(); toast(c.name + ' 해금!'); open('chars'); } else toast('코인이 부족해요'); };
+  bSel.textContent = un ? (api.picked() === id ? '선택중' : '선택') : '뽑기에서 획득';
+  bSel.onclick = () => { if (un) { api.pick(id); toast(c.name + ' 선택!'); open('chars'); } else toast(EVENT_ONLY.includes(id) ? '이벤트 뽑기에서만 얻을 수 있어요' : '뽑기에서만 얻을 수 있어요'); };
 };
 
 /* ---------- 이벤트 · 미션 ---------- */
