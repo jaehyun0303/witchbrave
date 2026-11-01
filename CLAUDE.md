@@ -85,6 +85,6 @@
 
 ## 5단계: 사일런트솔트 / 리치 궁극기 (각성 후 R키, 게이지 9000)
 - 사일런트솔트: HP 10000 이하 → `form='hour'`(침묵의 때: 데미지·범위 +30%, `skills.hour` 테이블). 궁극기 '신의 은포크 심판' = `startForkUlt/updForks/startSeal/updSeal/endSeal` (봉인수 내부: 망령 6 → 봉인수 처치 시 해제, 해제 후 `sealSoul`: 체력 -70%·데미지 -50%·쿨 +50%·패시브 소멸).
-- 리치: 궁극기 '드래곤의 심연' = `startLichUlt/updLult/startAbyss/updAbyss/endAbyss` (잡히면 30초 스턴, 탈출하면 `permRev/permSlow/mindOpen`).
+- 리치: 궁극기 '드래곤의 심연' = `startLichUlt/updLult/startAbyss/updAbyss/endAbyss` (잡히면 30초 스턴, 탈출하면 `permRev/permSlow/mindOpen`). 심연도 봉인수처럼 별도 세계(realm 1, x+500)라 시전자는 본 맵에서 계속 플레이하고 **G키/버튼으로 심연 화면 전환**(`realmS()`/`viewRealm()`/`world.viewAbyss`). 기둥(`B.objs`)은 `realm` 태그로 세계별 충돌.
 - 두 궁극기 모두 듀얼/AI 대전에서만(레이드·탐험 제외). 유리 깨짐은 `ui.glass()/glassFall()` DOM 오버레이.
 - 각성(SAVE.awake) 해금 UI는 아직 없음 → 테스트는 `WB.SAVE.awake=['silent','lich']`.

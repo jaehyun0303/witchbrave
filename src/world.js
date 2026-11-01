@@ -88,7 +88,7 @@ export function createWorld(canvas) {
   const slight = new THREE.PointLight(0x7dffd0, 1.6, 70); slight.position.set(0, 8, 0); sealRealm.add(slight);
   /* ----- 드래곤의 심연 ----- */
   const abyss = new THREE.Group(); abyss.visible = false; scene.add(abyss);
-  abyss.add(skyDome(0x120004, 0x4a0610, 0x0a0002, 0xff3a3a));
+  const adome = skyDome(0x120004, 0x4a0610, 0x0a0002, 0xff3a3a); adome.visible = false; abyss.add(adome);
   const afloor = new THREE.Mesh(new THREE.CylinderGeometry(82, 86, 1.2, 72), new THREE.MeshStandardMaterial({ color: 0x2a0a0e, roughness: .6, metalness: .3, emissive: 0x1a0408 }));
   afloor.position.y = -.6; afloor.receiveShadow = true; abyss.add(afloor);
   const arune = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0xff2a3a, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -142,7 +142,9 @@ export function createWorld(canvas) {
       scene.fog.color.set(on ? 0x3a0a40 : theme.fog[0]);
       bloom.strength = on ? .9 : theme.bloom;
     },
-    setAbyss(on) { this.setMind(false); arena.visible = !on; abyss.visible = on; scene.fog.color.set(on ? 0x1a0206 : theme.fog[0]); bloom.strength = on ? .9 : theme.bloom; },
+    // 심연은 본 맵 옆(x+500)에 따로 놓이고, 보는 사람이 심연 화면일 때만 하늘·안개를 바꾼다
+    setAbyss(on) { abyss.visible = on; abyss.position.x = 500; if (!on) this.viewAbyss(false); },
+    viewAbyss(on) { if (this._va === on) return; this._va = on; adome.visible = on; arena.visible = !on; scene.fog.color.set(on ? 0x1a0206 : theme.fog[0]); bloom.strength = on ? .9 : theme.bloom; },
     setSealRealm(on) { sealRealm.visible = on; },
     setSeal(on) { this.setMind(on); if (on) scene.fog.color.set(0x06161a); },
     setStorm(on) {

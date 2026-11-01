@@ -136,7 +136,7 @@ function updProjs(dt) {
         if (!p.pierce) killProj(p);
       }
     }
-    if (!p.pierce && p.life > 0) for (const o of B.objs) if (Math.hypot(p.x - o.x, p.y - o.y) < p.r + o.r) {
+    if (!p.pierce && p.life > 0) for (const o of B.objs) if ((o.realm || 0) === realmOf(p) && Math.hypot(p.x - o.x, p.y - o.y) < p.r + o.r) {
       vfx.burst('spark', wp, 14, { speed: 5, life: .4, size: .4, c0: p.color }); vfx.flash(wp, { color: p.color, size: 2.5, dur: .2 }); killProj(p);
     }
   }
@@ -275,9 +275,10 @@ const APEX = new THREE.Vector3(-3, 26, -32);
 const camState = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 42 };
 // 자유 시점: 우클릭 드래그=회전, 휠=줌, Q/E=회전, T=내 캐릭터 추적 ↔ 둘 다 보기
 const cam = { yaw: 0, pitch: .95, dist: 15, fit: false };
-const viewRealm = () => !!(B && B.seal && (B.fighters[0] === B.seal.target || B.viewSeal));
+const realmS = () => B && (B.seal || (B.abyss && !B.abyss.done ? B.abyss : null));   // 별도 세계(봉인수 내부 / 드래곤의 심연) 상태
+const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === s.target || B.viewSeal)); };
 function gameCamPose() {
-  let a, b; if (B.abyss) a = b = B.abyss.target; else if (viewRealm()) a = b = B.seal.target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
+  let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
   const tgt = cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
   const big = (a.form === 'dragon' || b.form === 'dragon' ? 1.15 : 1) * (a.big || b.big ? 1.9 : 1);
   const d = cam.dist * big + (cam.fit ? sep * .45 : 0), cp = Math.cos(cam.pitch);
@@ -1308,14 +1309,15 @@ function endSeal() {
   becomeSealSoul(t); ui.flash('#e6efff', .8, .6); shake(.9, .6);
 }
 function toggleSealView() {
-  if (!B || !B.seal || B.fighters[0] !== B.seal.owner) return;
-  B.viewSeal = !B.viewSeal; camState.init = false; ui.toast(B.viewSeal ? '봉인수 내부 화면' : '내 화면');
+  const s = realmS(); if (!s || B.fighters[0] !== s.owner) return;
+  B.viewSeal = !B.viewSeal; camState.init = false; ui.toast(B.viewSeal ? (B.abyss ? '드래곤의 심연 화면' : '봉인수 내부 화면') : '내 화면');
 }
 let sealBtn = null;
 function updSealBtn() {
   if (!sealBtn) { sealBtn = document.createElement('button'); sealBtn.id = 'sealview'; sealBtn.style.cssText = 'position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:80;padding:8px 16px;border-radius:999px;border:2px solid #7dffd0;background:rgba(6,22,26,.85);color:#bfffe8;font:700 14px sans-serif;display:none;cursor:pointer'; sealBtn.addEventListener('click', toggleSealView); document.body.appendChild(sealBtn); }
-  const show = !!(B && B.seal && B.fighters[0] === B.seal.owner); sealBtn.style.display = show ? 'block' : 'none';
-  if (show) sealBtn.textContent = B.viewSeal ? '↩ 내 화면으로 (G)' : '👁 봉인수 내부 보기 (G)';
+  const s = realmS(), show = !!(s && B.fighters[0] === s.owner); sealBtn.style.display = show ? 'block' : 'none';
+  if (show) { const ab = !!B.abyss; sealBtn.textContent = B.viewSeal ? '↩ 내 화면으로 (G)' : (ab ? '👁 드래곤의 심연 보기 (G)' : '👁 봉인수 내부 보기 (G)'); sealBtn.style.borderColor = ab ? '#ff6070' : '#7dffd0'; sealBtn.style.color = ab ? '#ffc0c8' : '#bfffe8'; }
+  if (B) world.viewAbyss(!!(B.abyss && !B.abyss.done && viewRealm()));
 }
 function becomeSealSoul(t) {
   clearStates(t); const ratio = Math.max(.01, t.hp / t.max);
@@ -1370,33 +1372,36 @@ function updLult(dt) {
   if (t >= 4.6) { ui.glass(false); B.lult = null; startAbyss(f, e); }
 }
 function startAbyss(f, t) {
-  B.barriers.forEach(removeBarrier); B.barriers = []; B.lakes.forEach(removeLake); B.lakes = []; B.hexes.forEach(removeHex); B.hexes = [];
-  clearStates(t); if (B.storm) endStorm(true);
-  // 연출용 메시 정리
+  // 적만 별도 세계(realm 1)로 보낸다. 시전자와 본 맵은 그대로 진행되고, G키로 심연 화면을 볼 수 있다.
+  clearStates(t); dropOwned(x => x.owner === t); if (B.storm && B.storm.f === t) endStorm(true);
   B.extra.forEach(m => world.scene.remove(m)); B.extra = [];
-  const A = B.abyss = { owner: f, target: t, ret: B.fighters.map(o => ({ o, x: o.x, y: o.y })), objs: B.objs, t: 0, open: false, caught: 0, meshes: [], portal: { x: W / 2 - 1250, y: H / 2 + (Math.random() < .5 ? -520 : 520) } };
-  B.objs = []; B.projs.forEach(killProj); B.projs = []; B.zones.forEach(z => { vfx.remove(z.tele); vfx.remove(z.tele2); if (z.mesh) world.scene.remove(z.mesh); }); B.zones = [];
-  f.sealHold = true; f.nofoe = true; f.hidden = true; f.st.inv = 1e9; f.pose = null; f.cast = null;
-  t.x = W / 2 - 650; t.y = H / 2; t.st.stun = 0; t.st.lock = 0; t.st.inv = 1;
-  world.setAbyss(true); ui.vignette(true); ui.flash('#ff2038', .9, .8); shake(.9, .6); ui.title('드래곤의 심연', '추격자를 피해 출구로 탈출하세요'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2600);
+  B.projs.forEach(p => { if (p.owner === t) killProj(p); });
+  B.zones.forEach(z => { if (z.owner === t) { vfx.remove(z.tele); vfx.remove(z.tele2); if (z.mesh) world.scene.remove(z.mesh); z.done = true; z.t = 1e9; } });
+  const A = B.abyss = { owner: f, target: t, ret: { x: t.x, y: t.y }, t: 0, open: false, caught: 0, meshes: [], portal: { x: W / 2 - 1250, y: H / 2 + (Math.random() < .5 ? -520 : 520) } };
+  B.viewSeal = false; camState.init = false; f.pose = null; f.cast = null;
+  t.realm = 1; t.x = W / 2 - 650; t.y = H / 2; t.st.stun = 0; t.st.lock = 0; t.st.inv = 1;
+  world.setAbyss(true); ui.flash('#ff2038', .9, .8); shake(.9, .6);
+  if (B.fighters[0] === t) { ui.title('드래곤의 심연', '추격자를 피해 출구로 탈출하세요'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2600); }
+  else toast(f, '적을 드래곤의 심연에 가뒀습니다. G키 또는 버튼으로 심연 화면을 볼 수 있어요');
   // 기둥(장애물)
   const mat = new THREE.MeshStandardMaterial({ color: 0x2a0a10, roughness: .7, emissive: 0x5a0a18, emissiveIntensity: .5, flatShading: true });
   for (let i = 0; i < 16; i++) {
     const x = W / 2 + rnd(-1500, 1300), y = H / 2 + rnd(-800, 800); if (Math.hypot(x - t.x, y - t.y) < 260 || Math.hypot(x - (W / 2 + 500), y - H / 2) < 260 || Math.hypot(x - A.portal.x, y - A.portal.y) < 240) continue;
-    B.objs.push({ x, y, r: 70 }); const m = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3, 11, 7), mat); m.position.copy(W3(x, y, 5.5)); addExtra(m); A.meshes.push(m);
+    B.objs.push({ x, y, r: 70, realm: 1 }); const m = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3, 11, 7), mat); m.position.copy(P3({ x, y, realm: 1 }, 5.5)); addExtra(m); A.meshes.push(m);
   }
   // 출구(닫힘 → 10초 후 열림)
   const pm = new THREE.Group(), ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, .35, 10, 40), new THREE.MeshBasicMaterial({ color: 0x555566 })); ring.position.y = 3.6; pm.add(ring);
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 40, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x555566, transparent: true, opacity: .3, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); beam.position.y = 20; pm.add(beam);
-  pm.position.copy(W3(A.portal.x, A.portal.y, 0)); addExtra(pm); A.pm = pm; A.ring = ring; A.beam = beam; A.meshes.push(pm);
+  pm.position.copy(P3({ x: A.portal.x, y: A.portal.y, realm: 1 }, 0)); addExtra(pm); A.pm = pm; A.ring = ring; A.beam = beam; A.meshes.push(pm);
   // 추격자
-  const c = A.chaser = addMinion('lich_chaser', W / 2 + 500, H / 2, { notag: true }); c.st.inv = 1e9; c.spdBoost = 1.12; c.face = Math.PI;
+  const c = A.chaser = addMinion('lich_chaser', W / 2 + 500, H / 2, { notag: true, realm: 1 }); c.st.inv = 1e9; c.spdBoost = 1.12; c.face = Math.PI;
   t.st.silence = Math.max(t.st.silence, 1);
   toast(t, '드래곤의 심연! 10초 뒤 출구가 열립니다. 추격자에게 잡히지 마세요');
 }
 function updAbyss(dt) {
   const A = B.abyss; if (!A || A.done) return; const t = A.target, c = A.chaser; A.t += dt;
   if (B.over) return;
+  const vw = viewRealm(); if (A.vig !== vw) { A.vig = vw; ui.vignette(vw); ui.cinema(vw && A.caught > 0); }
   t.st.silence = Math.max(t.st.silence, .5);
   if (!A.open && A.t >= 10) { A.open = true; A.ring.material.color.set(0x7dffd0); A.beam.material.color.set(0x7dffd0); A.beam.material.opacity = .5; ui.flash('#7dffd0', .4, .4); ui.pop(P3(t, 3.8), '🚪 출구가 열렸다!', '#7dffd0', true); toast(t, '출구가 열렸습니다!'); }
   if (A.open) { A.ring.rotation.z += dt * 2; if (Math.random() < .6) vfx.emit('glow', { x: A.pm.position.x + rnd(-2, 2), y: 0, z: A.pm.position.z + rnd(-2, 2), vy: rnd(3, 9), life: .8, s0: .6, s1: 0, c0: 0x7dffd0, drag: 0 }); }
@@ -1411,18 +1416,21 @@ function updAbyss(dt) {
     return;
   }
   if (dist(c, t) < c.r + t.r + 14) {
-    A.caught = .01; t.st.stun = 99; c.st.stun = 99; ui.cinema(true); ui.title('붙잡혔다…', '리치드래곤 쿠키의 도끼'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2600);
+    A.caught = .01; t.st.stun = 99; c.st.stun = 99; if (vw) { ui.cinema(true); ui.title('붙잡혔다…', '리치드래곤 쿠키의 도끼'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2600); }
     ui.pop(P3(t, 3.8), '붙잡혔다!', '#ff6070', true); return;
   }
   if (A.open && dist(t, A.portal) < 95) { endAbyss(true); return; }
   if (A.t > 70) A.caught = .01;
 }
 function endAbyss(escaped) {
-  const A = B.abyss; if (!A) return; const t = A.target, f = A.owner; A.done = true;
-  B.fighters.forEach(m => { if (m.minion) removeFighter(m); }); B.fighters = B.fighters.filter(m => !m.minion);
+  const A = B.abyss; if (!A) return; const t = A.target; A.done = true;
+  B.fighters.forEach(m => { if (m.minion && m.realm === 1) removeFighter(m); }); B.fighters = B.fighters.filter(m => !(m.minion && m.realm === 1));
   A.meshes.forEach(m => world.scene.remove(m));
-  A.ret.forEach(r => { r.o.x = r.x; r.o.y = r.y; }); B.objs = A.objs; B.projs.forEach(killProj); B.projs = [];
-  f.sealHold = false; f.nofoe = false; f.hidden = false; f.st.inv = 0; B.abyss = null;
+  B.objs = B.objs.filter(o => o.realm !== 1);
+  dropOwned(x => x.realm === 1 || (x.owner && x.owner.realm === 1)); if (B.storm && B.storm.f.realm) endStorm(true);
+  B.projs.forEach(p => { if (p.realm) killProj(p); });
+  B.zones.forEach(z => { if (z.realm) { vfx.remove(z.tele); vfx.remove(z.tele2); if (z.mesh) world.scene.remove(z.mesh); z.done = true; z.t = 1e9; } });
+  t.realm = 0; t.x = A.ret.x; t.y = A.ret.y; B.abyss = null; B.viewSeal = false; camState.init = false;
   world.setAbyss(false); ui.vignette(false); ui.cinema(false); t.st.stun = 0; t.st.silence = 0; t.st.inv = 1; ui.flash('#ffffff', .8, .6); shake(.8, .5);
   if (escaped) {
     t.permRev = true; t.permSlow = true; t.mindOpen = true;
@@ -1629,7 +1637,8 @@ function aiInput(f) {
   return inp;
 }
 function aimPoint(f) {
-  if (f.st.charm > 0 && B.objs.length) { let best = B.objs[0]; for (const o of B.objs) if (dist(f, o) < dist(f, best)) best = o; return best; }
+  const os = f.st.charm > 0 ? B.objs.filter(o => (o.realm || 0) === realmOf(f)) : [];
+  if (os.length) { let best = os[0]; for (const o of os) if (dist(f, o) < dist(f, best)) best = o; return best; }
   if (f.ctrl.kind === 'h1') {
     if (isTouch) {   // 터치: 기본은 상대 자동 조준, 스킬 버튼을 드래그해서 뗀 직후에는 그 방향으로 조준
       const t = TOUCH.aim; if (t && performance.now() < TOUCH.until) { const d = camRel(t.dx / t.m, t.dy / t.m), L = 150 + 580 * clamp(t.m / 70, 0, 1); return { x: f.x + d.x * L, y: f.y + d.y * L }; }
@@ -1684,8 +1693,11 @@ function updFighter(f, dt) {
     f.x += inp.mx / len * sp * dt * on; f.y += inp.my / len * sp * dt * on;
   }
   f.x = clamp(f.x, PAD, W - PAD); f.y = clamp(f.y, PAD, H - PAD);
-  if (f.realm) { f.x = clamp(f.x, W / 2 - 520, W / 2 + 520); f.y = clamp(f.y, H / 2 - 400, H / 2 + 400); }
-  for (const o of B.objs) { const d = dist(f, o); if (d < f.r + o.r) { const a = ang(o, f); f.x = o.x + Math.cos(a) * (f.r + o.r); f.y = o.y + Math.sin(a) * (f.r + o.r); } }
+  if (f.realm) {
+    if (B.abyss) { const dx = f.x - W / 2, dy = f.y - H / 2, dd = Math.hypot(dx, dy), mx = 1900; if (dd > mx) { f.x = W / 2 + dx / dd * mx; f.y = H / 2 + dy / dd * mx; } }
+    else { f.x = clamp(f.x, W / 2 - 520, W / 2 + 520); f.y = clamp(f.y, H / 2 - 400, H / 2 + 400); }
+  }
+  for (const o of B.objs) { if ((o.realm || 0) !== realmOf(f)) continue; const d = dist(f, o); if (d < f.r + o.r) { const a = ang(o, f); f.x = o.x + Math.cos(a) * (f.r + o.r); f.y = o.y + Math.sin(a) * (f.r + o.r); } }
   const mvd = Math.hypot(f.x - ox, f.y - oy) * S / Math.max(dt, 1e-4); f.vel = lerp(f.vel, mvd, .3);
   // 달리기 먼지
   if (f.vel > 3 && Math.random() < .5) vfx.emit('smoke', { x: f.root.position.x, y: .1, z: f.root.position.z, vy: .8, life: .5, s0: .5, s1: 1.2, c0: 0x8a80c0, a: .35 });
@@ -1714,7 +1726,7 @@ function inRealm(rl, fn) {
     }
   }
 }
-const inR = fn => { if (B.seal) { inRealm(0, fn); inRealm(1, fn); } else fn(); };
+const inR = fn => { if (B.seal || B.abyss) { inRealm(0, fn); inRealm(1, fn); } else fn(); };
 function update(dt) {
   B.dt = dt; updSealBtn();
   B.shakeT = Math.max(0, B.shakeT - dt); if (B.shakeT <= 0) B.shake = Math.max(0, B.shake - dt * 3);
@@ -1848,7 +1860,7 @@ function cleanup() {
   B.fighters.forEach(f => { if (f.drain) endDrain(f); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
   B.lakes.forEach(removeLake); B.hexes.forEach(removeHex); B.fighters.forEach(f => f.veil && world.scene.remove(f.veil.group)); B.angels.forEach(a => world.scene.remove(a.g)); B.zones.forEach(z => z.mesh && world.scene.remove(z.mesh));
   B.fighters.forEach(f => { if (f.cast && f.cast.group) world.scene.remove(f.cast.group); }); world.setParadise(false);
-  B.extra.forEach(m => world.scene.remove(m)); ui.glass(false); if (sealBtn) sealBtn.style.display = 'none';
+  B.extra.forEach(m => world.scene.remove(m)); ui.glass(false); world.setAbyss(false); if (sealBtn) sealBtn.style.display = 'none';
   if (B.cut) { world.scene.remove(B.cut.moon.group); (B.cut.eyes || []).forEach(e => world.scene.remove(e)); }
   B.barriers.forEach(removeBarrier); B.lights.forEach(removeLight); if (B.storm) endStorm(true); world.setStorm(false);
   [...vfx.items].forEach(i => vfx.drop(i));
