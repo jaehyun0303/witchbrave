@@ -1,6 +1,9 @@
 // 로비 UI. 디자인 목업(src/ui-screens/*.html, 1280x720 아트보드)을 그대로 불러와 화면 크기에 맞추고, 게임 데이터(코인·캐릭터·모드 등)를 채운다.
 // 3D 캐릭터는 UI 위에 올린 투명 캔버스가 getView() 영역에만 그린다 (자리 표시 실루엣은 제거).
 import LOADING from './ui-screens/loading.html';
+import { playGacha } from './gachafx.js';
+import { ART_A, ART_B } from './loadart.js';
+import * as hub from './hub.js';
 import LOBBY from './ui-screens/lobby.html';
 import MODE from './ui-screens/mode-select.html';
 import CHARSEL from './ui-screens/character-select.html';
@@ -12,28 +15,31 @@ import SHOP from './ui-screens/shop.html';
 // 모드를 늘리려면 MODES 에 항목을 추가한다. ready:false 는 "준비 중" 표시.
 export const MODES = [
   { id: 'ai', title: 'AI 대전', desc: '1 vs 1 · 상대는 AI', long: 'AI 상대와 1 대 1로 싸웁니다. 승리하면 코인과 트로피를 얻어요.', chips: ['1 vs 1', 'AI 상대'], ready: true },
-  { id: 'local', title: '로컬 2P', desc: '한 화면에서 1 vs 1', long: '한 화면에서 두 명이 1 대 1로 싸웁니다. 트로피와 코인은 오르지 않아요.', chips: ['1 vs 1', '같은 화면'], ready: true },
+  { id: 'online', title: '온라인 대전', desc: '서버 매칭 1 vs 1', long: '서버에서 상대를 찾아 1 대 1로 싸웁니다. 곧 열립니다.', chips: ['1 vs 1', '서버 매칭'], ready: false },
   { id: 'cap', title: '3v3 점령', desc: '3 vs 3 거점 점령', long: '곧 열립니다.', chips: ['3 vs 3', '거점 점령'], ready: false },
   { id: 'raid', title: '보스 레이드', desc: '4인 협동 보스 처치', long: '곧 열립니다.', chips: ['4인 협동', '보스 처치'], ready: false },
   { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: '곧 열립니다.', chips: ['1 vs 1', '먼저 3승'], ready: false },
   { id: 'rank', title: '랭크 매치', desc: '3 vs 3 시즌 랭킹', long: '곧 열립니다.', chips: ['3 vs 3', '시즌 랭킹'], ready: false },
 ];
 const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
-  silent: { rar: '영웅', group: '딜러', role: '근접 검사', atk: 62, spd: 55, rng: 25 },
-  lich: { rar: '전설', group: '딜러', role: '마법 딜러', atk: 70, spd: 50, rng: 60 },
-  shadow: { rar: '전설', group: '암살자', role: '암살자', atk: 55, spd: 70, rng: 50 },
-  sugar: { rar: '전설', group: '서포터', role: '서포터', atk: 45, spd: 45, rng: 75 },
-  dark: { rar: '영웅', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
+  silent: { rar: '비스트', group: '딜러', role: '근접 검사', atk: 62, spd: 55, rng: 25 },
+  lich: { rar: '드래곤', group: '딜러', role: '마법 딜러', atk: 70, spd: 50, rng: 60 },
+  shadow: { rar: '비스트', group: '암살자', role: '암살자', atk: 55, spd: 70, rng: 50 },
+  sugar: { rar: '비스트', group: '서포터', role: '서포터', atk: 45, spd: 45, rng: 75 },
+  dark: { rar: '레전더리', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
 };
-const RC = { 전설: ['#ffb02e', '#ffd873'], 영웅: ['#b57cff', '#cfa5ff'], 희귀: ['#5cc8ff', '#8fdcff'], 일반: ['#9bb4c9', '#c1d2e0'] };
-const meta = id => META[id] || { rar: '일반', group: '딜러', role: '', atk: 50, spd: 50, rng: 50 };
+// 등급제: 커먼 < 레어 < 에픽 < 슈퍼에픽 < 레전더리 < 에인션트 < 비스트 < 드래곤
+export const RARITIES = ['커먼', '레어', '에픽', '슈퍼에픽', '레전더리', '에인션트', '비스트', '드래곤'];
+const RC = { 커먼: ['#9bb4c9', '#c1d2e0'], 레어: ['#5cc8ff', '#8fdcff'], 에픽: ['#b57cff', '#cfa5ff'], 슈퍼에픽: ['#ff6fb5', '#ffa0d0'], 레전더리: ['#ffb02e', '#ffd873'], 에인션트: ['#2fd39a', '#8af0c8'], 비스트: ['#ff5a4d', '#ff9a8c'], 드래곤: ['#7a5cff', '#3fe0ff'] };
+export const rarGrade = r => Math.max(1, RARITIES.indexOf(r) + 1);
+const meta = id => META[id] || { rar: '커먼', group: '딜러', role: '', atk: 50, spd: 50, rng: 50 };
 const DAILY = [
   { id: 'd1', t: '경기 1회 플레이하기', k: 'plays', n: 1, r: 100 }, { id: 'd2', t: 'AI에게 1번 승리하기', k: 'wins', n: 1, r: 200 },
-  { id: 'd3', t: '승리 3번 달성하기', k: 'wins', n: 3, r: 300 }, { id: 'd4', t: '뽑기 1회 돌리기', k: 'gachas', n: 1, r: 100 }, { id: 'd5', t: '상점에서 무료 선물 받기', k: 'gift', n: 1, r: 100 },
+  { id: 'd3', t: '승리 3번 달성하기', k: 'wins', n: 3, r: 300 }, { id: 'd4', t: '뽑기 1회 돌리기', k: 'gachas', n: 1, r: 100 }, { id: 'd5', t: '상점에서 무료 선물 받기', k: 'gift', n: 1, r: 100 }, { id: 'd6', t: '출석 체크하기', k: 'att', n: 1, r: 150 },
 ];
 const WEEKLY = [
   { id: 'w1', t: '경기 10회 플레이하기', k: 'wplays', n: 10, r: 500 }, { id: 'w2', t: '승리 5번 달성하기', k: 'wwins', n: 5, r: 600 },
-  { id: 'w3', t: '뽑기 5회 돌리기', k: 'wgachas', n: 5, r: 400 }, { id: 'w4', t: '승리 10번 달성하기', k: 'wwins', n: 10, r: 1000 }, { id: 'w5', t: '경기 25회 플레이하기', k: 'wplays', n: 25, r: 1000 },
+  { id: 'w3', t: '뽑기 5회 돌리기', k: 'wgachas', n: 5, r: 400 }, { id: 'w4', t: '승리 10번 달성하기', k: 'wwins', n: 10, r: 1000 }, { id: 'w5', t: '경기 25회 플레이하기', k: 'wplays', n: 25, r: 1000 }, { id: 'w6', t: '출석 5일 하기', k: 'watt', n: 5, r: 800 },
 ];
 export const SEASON = { no: 1, name: '찬란한 지식의 봄', part: 1, parts: ['거짓은 심연을 삼키고', '진리는 따스히 세상을 비추리라'], main: ['shadow'] };   // 메인 고등급: 쉐도우밀크 · 퓨어바닐라(미구현) 및 각성
 const partName = () => SEASON.parts[SEASON.part - 1];
@@ -57,16 +63,17 @@ const weekKey = () => Math.floor((Date.now() + 4 * 864e5) / (7 * 864e5));
 
 export function ensureSave(SAVE) {
   SAVE.gems = SAVE.gems || 0; SAVE.tickets = SAVE.tickets || 0; SAVE.pity = SAVE.pity || 0; SAVE.totalWins = SAVE.totalWins || 0; SAVE.tro = SAVE.tro || {};
-  const m = SAVE.mi = Object.assign({ day: '', wk: 0, plays: 0, wins: 0, gachas: 0, gift: 0, wplays: 0, wwins: 0, wgachas: 0, claimed: {} }, SAVE.mi);
-  if (m.day !== today()) { m.day = today(); m.plays = m.wins = m.gachas = m.gift = 0; DAILY.forEach(d => delete m.claimed[d.id]); }
-  if (m.wk !== weekKey()) { m.wk = weekKey(); m.wplays = m.wwins = m.wgachas = 0; WEEKLY.forEach(d => delete m.claimed[d.id]); }
+  const m = SAVE.mi = Object.assign({ day: '', wk: 0, plays: 0, wins: 0, gachas: 0, gift: 0, att: 0, wplays: 0, wwins: 0, wgachas: 0, watt: 0, claimed: {} }, SAVE.mi);
+  if (m.day !== today()) { m.day = today(); m.plays = m.wins = m.gachas = m.gift = m.att = 0; DAILY.forEach(d => delete m.claimed[d.id]); }
+  if (m.wk !== weekKey()) { m.wk = weekKey(); m.wplays = m.wwins = m.wgachas = m.watt = 0; WEEKLY.forEach(d => delete m.claimed[d.id]); }
   return m;
 }
 export function recordMatch(SAVE, charId, win) {
   const m = ensureSave(SAVE); m.plays++; m.wplays++;
   if (win) { m.wins++; m.wwins++; SAVE.totalWins++; }
-  SAVE.tro[charId] = Math.max(0, (SAVE.tro[charId] || 0) + (win ? 8 : -4));
+  SAVE.tro[charId] = Math.max(0, (SAVE.tro[charId] || 0) + (win ? 8 : -4)); hub.hubMatch(win);
 }
+export const recordRaid = dmg => hub.hubRaid(dmg);
 const charLv = id => Math.min(15, 1 + Math.floor((S().wins[id] || 0) / 2));
 const claimable = list => { const m = ensureSave(S()); return list.filter(d => m[d.k] >= d.n && !m.claimed[d.id]); };
 
@@ -98,7 +105,8 @@ export function getView() {   // 3D 캐릭터를 그릴 영역(CSS px). 화면�
   const s = +host.dataset.s, ox = +host.dataset.ox, oy = +host.dataset.oy;
   return { x: ox + view.x * s, y: oy + view.y * s, w: view.w * s, h: view.h * s, f: view.f };
 }
-export const previewId = () => (cur === 'chars' ? viewId : cur === 'lobby' ? api.picked() : cur === 'gacha' ? pickupId : null);
+let busy = 0;   // 뽑기 연출/결과가 떠 있는 동안에는 3D 캐릭터를 그리지 않는다 (UI 위를 덮어서 보상이 가려지는 문제 방지)
+export const previewId = () => busy ? null : (cur === 'chars' ? viewId : cur === 'lobby' ? api.picked() : cur === 'gacha' ? pickupId : null);
 
 export function open(name) {
   ensureHost(); host.style.display = 'block';
@@ -110,20 +118,52 @@ export function open(name) {
   fit();
 }
 export function hide() { if (host) host.style.display = 'none'; view = null; cur = null; }
-export function refresh() { if (cur && cur !== 'loading') open(cur); }
-export function init(a) { api = a; ensureSave(S()); viewId = api.picked(); open('lobby'); }
+export function refresh() { if (cur && build[cur]) open(cur); }
+export function openCustom(name, html, bg = '#3a2048') {
+  ensureHost(); host.style.display = 'block'; const w = wraps[name] || (wraps[name] = Object.assign(document.createElement('div'), { className: 'scr' })); host.appendChild(w); w.innerHTML = html;
+  for (const [k, v] of Object.entries(wraps)) v.style.display = k === name ? 'block' : 'none';
+  cur = name; view = null; host.style.background = bg; fit(); return w;
+}
+export function init(a) { api = a; ensureSave(S()); hub.initHub({ S, api: a, toast, openCustom, back: () => open('lobby') }); viewId = api.picked(); open('lobby'); }
 
 /* ---------- 로딩 ---------- */
 export function bootLoading() {
   ensureHost(); const w = wraps.loading = document.createElement('div'); w.className = 'scr'; host.appendChild(w);
   const art = parse(LOADING); { const n = textNodes(art).find(t => t.data.includes('[업데이트 이름]')); if (n) n.data = 'SEASON ' + SEASON.no + ' · ' + SEASON.name; setText(art, '[버전 번호]', 'v0.1.0 · PART ' + SEASON.part + ' ' + partName()); } setText(art, TIPS[0] ? 'TIP · 스킬은 적이 모여 있을 때 사용하면 더 효과적이에요.' : '', 'TIP · ' + TIPS[Math.floor(Math.random() * TIPS.length)]);
+  for (const [lab, svg] of [['캐릭터 A 일러스트 자리', ART_A], ['캐릭터 B 일러스트 자리', ART_B]]) { const ph = art.querySelector(`svg[aria-label="${lab}"]`); if (ph) { const t = document.createElement('div'); t.innerHTML = svg; ph.replaceWith(t.firstChild); } }
   w.appendChild(art); w.style.display = 'block'; host.style.background = '#2b1a5c'; host.style.display = 'block'; cur = 'loading'; fit(); setProgress(0);
 }
-export function setProgress(p) {
-  const w = wraps.loading; if (!w) return; const pc = Math.round(p * 100) + '%';
-  const bar = w.querySelector('[style*="width:64%"]'); if (bar) bar.style.width = pc;
-  const t = findText(w, '64%') || findText(w, '100%') || textNodes(w).find(n => /^\d+%$/.test(n.data.trim())); if (t) t.data = pc;
+let ld = null;   // 로딩 상태: 막대/퍼센트/문구 노드, 표시값(부드럽게 차오름), 목표값
+function ldFind(w) {
+  const bar = w.querySelector('[style*="width:64%"]'), pct = findText(w, '64%'), label = findText(w, '로딩 중...');
+  bar.style.transition = 'none';
+  return { w, bar, pct, label, shown: 0, target: 0, ready: false, cb: null, started: false, t0: performance.now() };
 }
+export function setProgress(p) {
+  const w = wraps.loading; if (!w) return;
+  if (!ld) { ld = ldFind(w); ldTick(); }
+  ld.target = Math.max(ld.target, p);
+}
+function ldTick() {
+  if (!ld) return;
+  // 실제 진행도를 따라가되, 너무 빨리 끝나지 않도록 최소 시간(약 2.4초)에 걸쳐 차오르게 한다
+  const el = (performance.now() - ld.t0) / 2400, goal = Math.min(ld.target, Math.min(1, el));
+  ld.shown += (goal - ld.shown) * .12 + (goal > ld.shown ? .002 : 0); if (ld.shown > goal) ld.shown = goal;
+  const pc = Math.round(ld.shown * 100);
+  ld.bar.style.width = pc + '%'; ld.pct.data = pc + '%';
+  if (ld.ready && ld.shown >= .995 && !ld.started) ldPrompt();
+  else requestAnimationFrame(ldTick);
+}
+function ldPrompt() {
+  ld.started = true; ld.bar.style.width = '100%'; ld.pct.data = '100%';
+  ld.label.data = 'Click to Start'; const lab = ld.label.parentElement;
+  const sn = textNodes(ld.w).find(t => t.data.startsWith('SEASON ')); if (sn) sn.parentElement.style.visibility = 'hidden';
+  Object.assign(lab.style, { animation: 'ldblink 1s ease-in-out infinite', left: '0', width: '1280px', textAlign: 'center', fontSize: '34px', top: '560px', lineHeight: '40px' });
+  const go = () => { host.removeEventListener('pointerdown', go); try { const d = document.documentElement; (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d); screen.orientation?.lock?.('landscape').catch(() => {}); } catch (_) {} const cb = ld.cb; ld = null; cb && cb(); };
+  host.addEventListener('pointerdown', go);
+}
+// 모든 모델이 준비되면 호출: 게이지가 끝까지 차면 "Click to Start" 를 띄우고, 클릭하면 cb 실행
+export function loadingDone(cb) { if (!ld && wraps.loading) { ld = ldFind(wraps.loading); ldTick(); } ld.target = 1; ld.ready = true; ld.cb = cb; }
 
 /* ---------- 공통: 재화 칩, 닫기 ---------- */
 function currencies(art, gemsText, coinsText) {
@@ -143,16 +183,20 @@ build.lobby = art => {
   const chip = findText(art, mt.rar)?.parentElement; if (chip) chip.style.background = RC[mt.rar][0];
   setText(art, '3v3 점령', (MODES.find(m => m.id === st.mode) || MODES[0]).title);
   const evb = byLabel(art, '이벤트'), mib = byLabel(art, '미션'), badge = (b, n) => { const s = [...b.querySelectorAll('span')].find(x => /^\d+$/.test(x.textContent.trim())); if (s) { if (n) s.textContent = n; else s.remove(); } };
-  badge(evb, claimable(WEEKLY).length); badge(mib, claimable(DAILY).length);
-  setText(art, '별빛 축제', '시즌 ' + SEASON.no); setText(art, '한정 이벤트', partName()); setText(art, 'D-5', 'PART ' + SEASON.part); setText(art, '시즌 패스 Lv 7', '시즌 ' + SEASON.no + ' 패스 Lv 1');
+  badge(evb, hub.eventBadge()); badge(mib, claimable(DAILY).length);
+  setText(art, '별빛 축제', '시즌 ' + SEASON.no); setText(art, '한정 이벤트', partName()); setText(art, 'D-5', 'PART ' + SEASON.part); setText(art, '시즌 패스 Lv 7', '시즌 ' + SEASON.no + ' 패스 Lv ' + hub.passLevel());
   byLabel(art, '플레이').onclick = () => { const foe = st.foe === 'random' ? api.ORDER[Math.floor(Math.random() * api.ORDER.length)] : st.foe; hide(); api.start(api.picked(), foe, st.mode); };
   byLabel(art, '캐릭터 선택').onclick = () => { viewId = api.picked(); filter = '전체'; open('chars'); };
   byLabel(art, '모드 변경').onclick = () => open('mode');
   byLabel(art, '상점').onclick = () => open('shop'); byLabel(art, '뽑기').onclick = () => open('gacha');
-  byLabel(art, '이벤트').onclick = () => { missionTab = 'weekly'; open('events'); }; byLabel(art, '미션').onclick = () => { missionTab = 'daily'; open('events'); };
-  byLabel(art, '별빛 축제 이벤트').onclick = () => { missionTab = 'weekly'; open('events'); };
+  byLabel(art, '이벤트').onclick = () => hub.openEvent('pick'); byLabel(art, '미션').onclick = () => { missionTab = 'daily'; open('events'); };
+  byLabel(art, '별빛 축제 이벤트').onclick = () => hub.openEvent('pick');
+  const mailB = byLabel(art, '우편함'); mailB.setAttribute('aria-label', '출석 체크');
+  mailB.innerHTML = '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 30 30" style="position:absolute;left:6px;top:6px"><rect x="3" y="6" width="24" height="20" rx="3" fill="#fff" stroke="#2b1830" stroke-width="2.5"/><rect x="3" y="6" width="24" height="6" fill="#ff5c8a" stroke="#2b1830" stroke-width="2.5"/><path d="M9 18l4 4 8-8" fill="none" stroke="#2b1830" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (hub.attendReady() ? '<span style="position:absolute;right:-6px;top:-8px;width:20px;height:20px;border-radius:50%;background:#ff3b5c;border:3px solid #2b1830"></span>' : '');
+  mailB.onclick = hub.openAttend; byLabel(art, '시즌 패스').onclick = hub.openPass;
   byLabel(art, '설정').onclick = openSettings;
-  for (const l of ['프로필', '우편함', '시즌 패스', '채팅', '친구 초대 1', '친구 초대 2', '보석 충전', '코인 충전', '뽑기권 충전']) byLabel(art, l).onclick = l === '코인 충전' || l === '뽑기권 충전' ? () => open('shop') : soon;
+  byLabel(art, '프로필').onclick = () => hub.openProfile('info');
+  for (const l of ['채팅', '친구 초대 1', '친구 초대 2', '보석 충전', '코인 충전', '뽑기권 충전']) byLabel(art, l).onclick = l === '코인 충전' || l === '뽑기권 충전' ? () => open('shop') : soon;
 };
 
 /* ---------- 모드 선택 ---------- */
@@ -173,7 +217,7 @@ build.mode = art => {
   for (const t of ['랭크', '이벤트']) { const b = btnByText(panel, t); if (b) b.onclick = soon; }
   bBtn.onclick = () => { st.mode = MODES[sel].id; back(); };
   byLabel(art, '닫기').onclick = back;
-  // 상대 선택 (AI 대전 / 로컬 2P 의 상대 캐릭터)
+  // 상대 선택 (AI 대전의 상대 캐릭터)
   const foeOpts = ['random', ...api.ORDER], chip = document.createElement('button');
   chip.style.cssText = "position:absolute;left:690px;top:86px;width:320px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#fff;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:19px;color:#2b1830;cursor:pointer";
   const label = () => '상대: ' + (st.foe === 'random' ? '랜덤' : api.CHARS[st.foe].name) + '  ▶'; chip.textContent = label();
@@ -260,13 +304,13 @@ build.events = art => {
 };
 
 /* ---------- 뽑기 ---------- */
-const RATES = [['전설 2.5%', '캐릭터 3%'], ['영웅 9.5%', '코인 1,000 5%'], ['희귀 28%', '코인 500 12%'], ['일반 60%', '코인 100~200 80%']];
+const RATES = [['전설 2.5%', '캐릭터 3%'], ['영웅 9.5%', '에픽 코인 1,000 5%'], ['희귀 28%', '레어 코인 500 12%'], ['일반 60%', '커먼 코인 100~200 80%']];
 function draw(n, useTicket) {
   const SAVE = S(), cost = n === 10 ? 2700 : 300;
   if (useTicket) { if (SAVE.tickets < 1) return toast('뽑기권이 없어요'); SAVE.tickets--; n = 1; } else { if (SAVE.coins < cost) return toast('코인이 부족해요'); SAVE.coins -= cost; }
   const m = ensureSave(SAVE), out = [];
   for (let i = 0; i < n; i++) {
-    m.gachas++; m.wgachas++; SAVE.pity++; const r = Math.random() * 100, locked = api.ORDER.filter(id => !SAVE.unlocked.includes(id));
+    m.gachas++; m.wgachas++; hub.hubStat('pulls'); SAVE.pity++; const r = Math.random() * 100, locked = api.ORDER.filter(id => !SAVE.unlocked.includes(id));
     if ((r < 3 || SAVE.pity >= 30) && locked.length) { const id = locked[Math.floor(Math.random() * locked.length)]; SAVE.unlocked.push(id); SAVE.pity = 0; out.push({ k: 'n', s: api.CHARS[id].name, sub: meta(id).rar + ' · 신규' }); continue; }
     if (r < 3) SAVE.pity = 0;
     const coin = r < 8 ? 1000 : r < 20 ? 500 : r < 50 ? 200 : 100; SAVE.coins += coin; out.push({ k: 'c', s: fmt(coin), sub: '코인' });
@@ -289,14 +333,15 @@ build.gacha = art => {
   const b1 = [...art.querySelectorAll('button')].find(b => b.textContent.includes('1회 뽑기') && !b.textContent.includes('10회')), b10 = [...art.querySelectorAll('button')].find(b => b.textContent.includes('10회 뽑기')), bt = [...art.querySelectorAll('button')].find(b => b.textContent.includes('티켓 사용'));
   b1.onclick = () => draw(1, false); b10.onclick = () => draw(10, false); bt.onclick = () => draw(1, true);
   for (const t of ['픽업 뽑기', '일반 뽑기', '코인 뽑기', '확률 정보 상세', '뽑기 기록']) { const b = btnByText(art, t); if (b) b.onclick = soon; }
-  if (pop) showResults(art, pop), pop = null;
+  if (pop) { const items = pop; pop = null; busy++; playGacha(art, items.map(gradeOf), () => showResults(art, items)); }
 };
+const gradeOf = it => it.k === 'n' ? rarGrade(it.sub.split(' ')[0]) : (it.g || (parseInt(it.s.replace(/,/g, ''), 10) >= 1000 ? 3 : parseInt(it.s.replace(/,/g, ''), 10) >= 500 ? 2 : 1));
 function showResults(art, items) {
-  const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:rgba(43,24,48,.82);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px';
+  const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:rgba(43,24,48,.95);z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px';
   const cards = items.map((it, i) => `<div style="width:${items.length > 5 ? 150 : 190}px;height:${items.length > 5 ? 120 : 150}px;box-sizing:border-box;border:4px solid #2b1830;border-radius:20px;background:${it.k === 'n' ? 'repeating-linear-gradient(45deg,#ffd873 0,#ffd873 14px,#fff3df 14px,#fff3df 28px)' : '#fff3df'};box-shadow:0 5px 0 #2b1830;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:rp .45s ${i * .07}s both"><b style="font-family:'Black Han Sans','Jua',sans-serif;font-size:${it.k === 'n' ? 24 : 32}px;font-weight:400;color:#2b1830;line-height:1.1">${it.s}</b><span style="font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;color:#6b4a63;margin-top:4px">${it.sub}</span></div>`).join('');
   o.innerHTML = `<style>@keyframes rp{0%{transform:scale(.3) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}</style><div style="font-family:'Black Han Sans','Jua',sans-serif;font-size:52px;color:#fff;-webkit-text-stroke:8px #2b1830;paint-order:stroke fill">획득!</div><div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;max-width:1020px">${cards}</div>`;
   const ok = document.createElement('button'); ok.textContent = '확인'; ok.style.cssText = "width:200px;height:64px;border:4px solid #2b1830;border-radius:22px;background:#ffc233;box-shadow:inset 0 -7px 0 rgba(0,0,0,.2),0 6px 0 #2b1830;font-family:'Jua',sans-serif;font-size:30px;color:#2b1830;cursor:pointer";
-  ok.onclick = () => o.remove(); o.appendChild(ok); art.appendChild(o);
+  ok.onclick = () => { o.remove(); busy = Math.max(0, busy - 1); }; o.appendChild(ok); art.appendChild(o);
 }
 
 /* ---------- 상점 (뽑기·이벤트와 함께 확장 예정. 결제 상품은 아직 비활성) ---------- */
@@ -314,7 +359,7 @@ function openSettings() {
   w.innerHTML = `<div style="position:relative;width:1280px;height:720px;background:#3a2048;font-family:'Jua','Noto Sans KR',sans-serif;color:#2b1830"><div style="position:absolute;left:120px;top:36px;width:1040px;height:650px;box-sizing:border-box;overflow:hidden;background:#fff3df;border:4px solid #2b1830;border-radius:30px;box-shadow:0 8px 0 rgba(0,0,0,.35)">
   <div style="position:absolute;left:0;top:0;width:1032px;height:72px;background:#3a2048"></div><div style="position:absolute;left:28px;top:10px;font-family:'Black Han Sans','Jua',sans-serif;font-size:36px;line-height:52px;color:#fff">설정</div>
   <button id="st-close" aria-label="닫기" style="position:absolute;right:16px;top:11px;width:48px;height:48px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ff5c8a;box-shadow:inset 0 -5px 0 rgba(0,0,0,.2),0 4px 0 #2b1830;cursor:pointer;font-size:24px;color:#fff">✕</button>
-  <div style="position:absolute;left:32px;top:96px;width:960px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:16px;line-height:30px;color:#2b1830">조작 (1P) 이동 WASD · 평타 Space 또는 마우스 클릭 · 스킬 Z X C V · 쉐도우밀크 Q(쉐도우 스텝) R(궁극기) · 조준은 마우스<br>시점 우클릭 드래그 또는 [ ] 회전 · 휠 줌 · T 내 캐릭터 추적 ↔ 둘 다 보기<br>조작 (2P, 로컬) 이동 방향키 · 평타 Enter · 스킬 7 8 9 0 · 6(Q) -(R)<br>승리 +300 코인 · 패배 +100 코인 · 승리 트로피 +8 / 패배 -4</div>
+  <div style="position:absolute;left:32px;top:96px;width:960px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:16px;line-height:30px;color:#2b1830">조작 (1P) 이동 WASD · 평타 Space 또는 마우스 클릭 · 스킬 Z X C V · 쉐도우밀크 Q(쉐도우 스텝) R(궁극기) · 조준은 마우스<br>시점 우클릭 드래그 또는 [ ] 회전 · 휠 줌 · T 내 캐릭터 추적 ↔ 둘 다 보기<br>승리 +300 코인 · 패배 +100 코인 · 승리 트로피 +8 / 패배 -4</div>
   <button id="st-cheat" style="${bs};position:absolute;left:32px;top:300px;background:#5cc8ff">테스트: 전체 해금</button>
   <button id="st-reset" style="${bs};position:absolute;left:260px;top:300px;background:#ffe4bd">저장 데이터 초기화</button></div></div>`;
   for (const [k, v] of Object.entries(wraps)) v.style.display = k === 'settings' ? 'block' : 'none';

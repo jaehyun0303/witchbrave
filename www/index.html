@@ -28,14 +28,14 @@
   #cv{width:100%;height:100%;display:block;cursor:crosshair}
   #hud{position:absolute;inset:0;pointer-events:none;transition:opacity .4s}
   .cinema #hud{opacity:0}
-  .panel{position:absolute;top:14px;width:min(380px,44vw)}
-  .panel.left{left:16px}.panel.right{right:16px;text-align:right}
+  .hpanel{position:absolute;top:14px;width:min(380px,44vw)}
+  .hpanel.left{left:16px}.hpanel.right{right:16px;text-align:right}
   .pname{font-weight:800;font-size:15px;text-shadow:0 2px 6px #000}
   .hpbar{position:relative;height:22px;background:#000a;border:1px solid #fff3;border-radius:4px;overflow:hidden;margin-top:3px}
-  .hpfill,.hpghost{position:absolute;top:0;bottom:0}.panel.left .hpfill,.panel.left .hpghost{left:0}.panel.right .hpfill,.panel.right .hpghost{right:0}
+  .hpfill,.hpghost{position:absolute;top:0;bottom:0}.hpanel.left .hpfill,.hpanel.left .hpghost{left:0}.hpanel.right .hpfill,.hpanel.right .hpghost{right:0}
   .hpfill{background:linear-gradient(#6fd6ff,#3a8cff)}.right .hpfill{background:linear-gradient(#ffa070,#ff5a5a)}
   .hpghost{background:#fff8}
-  .shfill{position:absolute;top:0;height:8px;background:linear-gradient(#fff,#ffc4e8);box-shadow:0 0 6px #ffc4e8}.panel.left .shfill{left:0}.panel.right .shfill{right:0}
+  .shfill{position:absolute;top:0;height:8px;background:linear-gradient(#fff,#ffc4e8);box-shadow:0 0 6px #ffc4e8}.hpanel.left .shfill{left:0}.hpanel.right .shfill{right:0}
   .hptxt{position:absolute;inset:0;font-size:12px;line-height:22px;padding:0 8px;text-shadow:0 1px 3px #000}
   .skills{position:fixed;bottom:16px;display:flex;gap:8px}
   .left .skills{left:16px}.right .skills{right:16px}
@@ -58,6 +58,7 @@
   #ctitle div{font-size:clamp(34px,6vw,76px);font-weight:900;letter-spacing:.3em;color:#eef3ff;text-shadow:0 0 24px #7d9bff,0 0 60px #4a6bff;padding-left:.3em}
   #ctitle small{display:block;font-size:16px;letter-spacing:.5em;color:#9bb0ff;margin-top:6px}
   #ctitle.show{animation:tin 1.6s ease-out forwards}
+  @keyframes ldblink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.06)}}
   @keyframes tin{0%{opacity:0;letter-spacing:.9em;transform:scale(1.15)}30%{opacity:1}100%{opacity:1;letter-spacing:.3em;transform:scale(1)}}
   .vig:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,#0000 40%,#000b 100%);z-index:4}
   #result{position:absolute;inset:0;background:#000b;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-size:34px;font-weight:800;z-index:10}

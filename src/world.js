@@ -5,7 +5,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { tex } from './tex.js';
-import { heartMesh, buildCrystal } from './models.js';
+import { heartMesh } from './models.js';
+import { MAPS, buildProp, buildBush, buildDecor } from './maps.js';
+
+const S = .04;
 
 function skyDome(top, mid, bot, stars) {
   const g = new THREE.Group();
@@ -15,12 +18,12 @@ function skyDome(top, mid, bot, stars) {
     vertexShader: 'varying vec3 p; void main(){ p=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: 'uniform vec3 t,m,b; varying vec3 p; void main(){ float h=p.y; vec3 c=h>0.? mix(m,t,pow(h,.6)) : mix(m,b,pow(-h,.5)); gl_FragColor=vec4(c,1.); }',
   });
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), m));
+  g.userData.mat = m; g.add(new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), m));
   if (stars) {
     const n = 700, pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, y = Math.random() * .95 + .02, r = Math.sqrt(1 - y * y) * 280; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = y * 280; pos[i * 3 + 2] = Math.sin(a) * r; }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.add(new THREE.Points(geo, new THREE.PointsMaterial({ map: tex('glow'), size: 3.2, color: stars, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false, fog: false })));
+    g.userData.stars = new THREE.Points(geo, new THREE.PointsMaterial({ map: tex('glow'), size: 3.2, color: stars, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false, fog: false })); g.add(g.userData.stars);
   }
   return g;
 }
@@ -37,7 +40,7 @@ export function createWorld(canvas) {
   /* ----- 조명 ----- */
   const hemi = new THREE.HemisphereLight(0x8c88ff, 0x1a1030, .6); scene.add(hemi);
   const moonL = new THREE.DirectionalLight(0xb4bfff, 1.25); moonL.position.set(-14, 30, 12); moonL.castShadow = true;
-  moonL.shadow.mapSize.set(1024, 1024); Object.assign(moonL.shadow.camera, { left: -48, right: 48, top: 30, bottom: -30, near: 1, far: 130 }); moonL.shadow.bias = -.0004;
+  moonL.shadow.mapSize.set(1024, 1024); Object.assign(moonL.shadow.camera, { left: -46, right: 46, top: 32, bottom: -32, near: 1, far: 140 }); moonL.shadow.bias = -.0004;
   scene.add(moonL, moonL.target);
   const rimL = new THREE.DirectionalLight(0xff8ad8, .5); rimL.position.set(20, 10, -18); scene.add(rimL);
 
@@ -46,6 +49,8 @@ export function createWorld(canvas) {
   const sky = skyDome(0x050314, 0x241446, 0x0a0618, 0xcfd8ff); arena.add(sky);
   const ft = tex('floor'); ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(5, 3);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(72, 1.2, 41), new THREE.MeshStandardMaterial({ map: ft, roughness: .9, metalness: 0, color: 0x7a72b8 }));
+  const mapG = new THREE.Group(); arena.add(mapG); const bushList = [];
+  let theme = MAPS[0];
   floor.position.y = -.6; floor.receiveShadow = true; arena.add(floor);
   const rim = new THREE.Mesh(new THREE.BoxGeometry(72.6, .14, 41.6), new THREE.MeshBasicMaterial({ color: 0x6a58ff }));
   rim.position.y = .02; rim.scale.set(1, 1, 1); arena.add(rim); rim.position.y = -.05; rim.renderOrder = -1;
@@ -53,19 +58,18 @@ export function createWorld(canvas) {
   const centerRune = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0x6a58ff, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false }));
   centerRune.rotation.x = -Math.PI / 2; centerRune.position.y = .03; arena.add(centerRune);
   // 하단 떠다니는 바위
-  const rocks = [];
+  const rocks = [], rockG = new THREE.Group(); arena.add(rockG);
   for (let i = 0; i < 16; i++) {
     const r = new THREE.Mesh(new THREE.IcosahedronGeometry(1 + Math.random() * 2.5, 0), new THREE.MeshStandardMaterial({ color: 0x2a2150, flatShading: true, roughness: .9 }));
     const a = i / 16 * 6.283 + Math.random() * .3, d = 30 + Math.random() * 30;
     r.position.set(Math.cos(a) * d * 1.3, -4 - Math.random() * 14 + (Math.random() > .7 ? 12 : 0), Math.sin(a) * d * .8 - 6);
-    r.userData.b = r.position.y; r.userData.p = Math.random() * 6; r.rotation.set(Math.random() * 3, Math.random() * 3, 0); arena.add(r); rocks.push(r);
+    r.userData.b = r.position.y; r.userData.p = Math.random() * 6; r.rotation.set(Math.random() * 3, Math.random() * 3, 0); rockG.add(r); rocks.push(r);
   }
   // 아레나 하단 보라빛 글로우
   const under = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshBasicMaterial({ map: tex('glow'), color: 0x5a3aff, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false }));
   under.rotation.x = -Math.PI / 2; under.position.y = -3; arena.add(under);
   // 장애물(크리스탈)
   const crystals = [];
-  const obstacleGroup = new THREE.Group(); arena.add(obstacleGroup);
 
   /* ----- 정신세계 ----- */
   const mind = new THREE.Group(); mind.visible = false; scene.add(mind);
@@ -96,19 +100,36 @@ export function createWorld(canvas) {
   addEventListener('resize', resize); resize();
 
   const world = {
-    renderer, scene, camera, composer, bloom, arena, mind, obstacleGroup, crystals, moonL, hemi, resize, inMind: false,
-    setObstacles(list, S, W, H) {
-      crystals.forEach(c => obstacleGroup.remove(c)); crystals.length = 0;
-      for (const o of list) { const c = buildCrystal(); c.position.set((o.x - W / 2) * S, 0, (o.y - H / 2) * S); c.scale.setScalar(o.r * S / .95); c.userData.src = o; obstacleGroup.add(c); crystals.push(c); }
+    renderer, scene, camera, composer, bloom, arena, mind, crystals, moonL, hemi, resize, inMind: false, bushList,
+    clearMap() {
+      mapG.children.slice().forEach(c => { mapG.remove(c); c.traverse(o => o.geometry && o.geometry.dispose()); });
+      crystals.length = 0; bushList.length = 0;
     },
+    // 맵 테마/크기 적용 + 지형지물·풀숲·장식 생성 (L = layoutMap 결과)
+    setMap(map, L) {
+      this.clearMap(); theme = map; const w = map.W * S, h = map.H * S;
+      floor.geometry.dispose(); floor.geometry = new THREE.BoxGeometry(w, 1.2, h); ft.repeat.set(w / 14, h / 14); floor.material.color.set(map.floor);
+      rim.geometry.dispose(); rim.geometry = new THREE.BoxGeometry(w + .6, .14, h + .6); rim.material.color.set(map.rim);
+      edge.geometry.dispose(); edge.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, .02, h)); edge.material.color.set(map.edge);
+      under.scale.set(w / 72, h / 41, 1); under.material.color.set(map.rim); rockG.scale.set(w / 72, 1, h / 41); centerRune.scale.setScalar(Math.min(2.2, w / 72 * 1.4)); centerRune.material.color.set(map.rim);
+      const [t, m, b, st] = map.sky, u = sky.userData.mat.uniforms; u.t.value.set(t); u.m.value.set(m); u.b.value.set(b);
+      if (sky.userData.stars) { sky.userData.stars.visible = !!st; if (st) sky.userData.stars.material.color.set(st); }
+      scene.fog.color.set(map.fog[0]); scene.fog.density = map.fog[1]; hemi.color.set(map.hemi[0]); hemi.groundColor.set(map.hemi[1]); moonL.color.set(map.moon); bloom.strength = map.bloom;
+      const W3 = (o, y = 0) => new THREE.Vector3((o.x - map.W / 2) * S, y, (o.y - map.H / 2) * S);
+      for (const p of L.props) { const g = buildProp(map, p); g.position.copy(W3(p)); mapG.add(g); if (g.userData.crystal) crystals.push(g.userData.crystal); }
+      L.bushes.forEach((b, i) => { const g = buildBush(map, b, i + map.seed); g.position.copy(W3(b)); mapG.add(g); bushList.push(g); });
+      mapG.add(buildDecor(map, L.decor, map.W, map.H));
+    },
+    // 그림자 카메라가 보고 있는 지점을 따라가게 한다
+    focus(v) { moonL.target.position.copy(v); moonL.position.set(v.x - 14, 30, v.z + 12); },
     setMind(on) {
       this.inMind = on; arena.visible = !on; mind.visible = on;
-      scene.fog.color.set(on ? 0x3a0a40 : 0x120a2a);
-      bloom.strength = on ? .9 : .6;
+      scene.fog.color.set(on ? 0x3a0a40 : theme.fog[0]);
+      bloom.strength = on ? .9 : theme.bloom;
     },
     setParadise(on) {
-      floor.material.color.set(on ? 0xffc9e8 : 0x7a72b8); scene.fog.color.set(on ? 0xf4b8dc : 0x120a2a); scene.fog.density = on ? .005 : .0085;
-      hemi.color.set(on ? 0xffd6f0 : 0x8c88ff);
+      floor.material.color.set(on ? 0xffc9e8 : theme.floor); scene.fog.color.set(on ? 0xf4b8dc : theme.fog[0]); scene.fog.density = on ? .005 : theme.fog[1];
+      hemi.color.set(on ? 0xffd6f0 : theme.hemi[0]);
     },
     // 품질 단계: 0 = 기본, 1 = 그림자·블룸 끔 + 해상도 1배 (프레임이 느릴 때 자동 전환)
     quality: 0,
@@ -117,15 +138,16 @@ export function createWorld(canvas) {
     },
     // 로비/메뉴: 투명 배경 위에 캐릭터만 그린다 (배경·바닥·안개는 UI 가 담당)
     setLobby(on) {
-      arena.visible = !on; if (on) mind.visible = false; renderer.setClearColor(0x000000, on ? 0 : 1); scene.fog.density = on ? 0 : .0085;
-      hemi.color.set(on ? 0xffffff : 0x8c88ff); hemi.groundColor.set(on ? 0xffd6e8 : 0x1a1030); hemi.intensity = on ? 1.5 : .6;
-      moonL.color.set(on ? 0xffffff : 0xb4bfff); moonL.intensity = on ? 1.7 : 1.25; rimL.intensity = on ? .9 : .5;
+      arena.visible = !on; if (on) mind.visible = false; renderer.setClearColor(0x000000, on ? 0 : 1); scene.fog.density = on ? 0 : theme.fog[1];
+      hemi.color.set(on ? 0xffffff : theme.hemi[0]); hemi.groundColor.set(on ? 0xffd6e8 : theme.hemi[1]); hemi.intensity = on ? 1.5 : .6;
+      moonL.color.set(on ? 0xffffff : theme.moon); moonL.intensity = on ? 1.7 : 1.25; rimL.intensity = on ? .9 : .5;
     },
     setCut(on) {
       moonL.intensity = on ? .35 : 1.25; hemi.intensity = on ? .25 : .6; renderer.toneMappingExposure = on ? .9 : 1.05;
-      scene.fog.density = on ? .0025 : .0085;
+      scene.fog.density = on ? .0025 : theme.fog[1];
     },
     update(dt, time, charmed) {
+      bushList.forEach(b => b.userData.update(time));
       centerRune.rotation.z += dt * .06; mrune.rotation.z -= dt * .08;
       rocks.forEach(r => { r.position.y = r.userData.b + Math.sin(time * .5 + r.userData.p) * .6; r.rotation.y += dt * .05; });
       hearts.forEach(h => { h.position.y = h.userData.y + Math.sin(time * .8 + h.userData.p) * 1.2; h.rotation.y += dt * .6; });

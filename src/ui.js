@@ -15,6 +15,7 @@ export function initUI(a) {
 export const buildMenu = () => scr.refresh();
 export const refreshLobby = () => scr.refresh();
 export const recordMatch = (S, id, win) => scr.recordMatch(S, id, win);
+export const recordRaid = dmg => scr.recordRaid(dmg);
 export const getView = () => scr.getView();
 export const previewId = () => scr.previewId();
 
@@ -45,7 +46,7 @@ export function beginBattle(B) {
   B.fighters.forEach((f, i) => {
     const keys = f.ctrl.kind === 'h2' ? ['7', '8', '9', '0'] : ['Z', 'X', 'C', 'V'];
     const mine = f.ctrl.kind === 'h1' || (f.ctrl.kind === 'h2' && B.mode === 'local');
-    const p = document.createElement('div'); p.className = 'panel ' + (i ? 'right' : 'left');
+    const p = document.createElement('div'); p.className = 'hpanel ' + (i ? 'right' : 'left');
     p.innerHTML = `<div class="pname" style="color:${hex(f.def.color)}">${f.def.name}<span class="form"></span></div>
       <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><div class="shfill"></div><span class="hptxt"></span></div>
       ${mine ? `<div class="skills">${['z', 'x', 'c', 'v', 'q', 'r'].filter(k => f.def.skills.base[k]).map((k, j) => `<div class="slot" data-k="${k}"><i>${f.ctrl.kind === 'h2' ? { z: '7', x: '8', c: '9', v: '0', q: '6', r: '-' }[k] : k.toUpperCase()}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
@@ -75,7 +76,7 @@ export function update(B, camera, renderer, dt) {
   }
   for (const t of hud.tags) {
     const f = t.f; v3.set(f.root.position.x, f.root.position.y + (f.form === 'dragon' ? 6.4 : 2.9), f.root.position.z).project(camera);
-    const vis = v3.z < 1 && f.hp > 0 && !B.cut && !f.hidden;
+    const vis = v3.z < 1 && f.hp > 0 && !B.cut && !f.hidden && !f.bushHid;
     t.el.style.display = vis ? 'block' : 'none';
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
@@ -90,7 +91,7 @@ export function update(B, camera, renderer, dt) {
     p.el.style.transform = `translate(${(v3.x * .5 + .5) * w + p.dx}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-50%) scale(${(1 + Math.max(0, .25 - p.t) * 4) * p.sc})`;
     p.el.style.opacity = u < .6 ? 1 : 1 - (u - .6) / .4;
   }
-  const m = $('#mindtimer'); m.style.display = B.mind ? 'block' : 'none'; if (B.mind) m.textContent = '정신세계 ' + Math.ceil(B.mind.t) + 's';
+  const m = $('#mindtimer'); m.style.display = B.mind || B.raid ? 'block' : 'none'; if (B.mind) m.textContent = '정신세계 ' + Math.ceil(B.mind.t) + 's'; else if (B.raid) { m.style.color = '#ffd873'; m.textContent = '레이드 ' + Math.max(0, Math.ceil(B.raid.t)) + 's · 누적 피해 ' + Math.round(B.raid.dmg).toLocaleString(); }
 }
 
 export function pop(pos, text, color, big) {
@@ -110,4 +111,4 @@ export function title(text, sub) {
 }
 export function vignette(on) { $('#game').classList.toggle('vig', on); }
 export function result(text, sub) { $('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
-export function hideHud() { hud = null; }
+export function hideHud() { hud = null; $('#mindtimer').style.display = 'none'; }

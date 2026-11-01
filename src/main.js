@@ -10,4 +10,4 @@ import * as scr from './screens.js';
 scr.bootLoading();
 const jobs = [preloadLich(), preloadSugar(), preloadAxe(), preloadDragon(), preloadDark(), preloadShadow()];
 let n = 0; jobs.forEach(p => p.then(() => scr.setProgress(++n / jobs.length)));
-Promise.all(jobs).then(() => new Promise(r => setTimeout(r, 700))).then(init);
+Promise.all(jobs).then(() => scr.loadingDone(init));

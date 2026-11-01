@@ -1,14 +1,18 @@
 // 전투 로직 + 스킬 연출 + 컷신. 로직은 2D 좌표(x,y)로 계산하고 3D 월드(x,z)로 매핑한다.
 import * as THREE from 'three';
 import { createWorld } from './world.js';
-import { VFX, ease } from './vfx.js';
+import { MAPS, layoutMap } from './maps.js';
+import { RAID_BOSS_HP, RAID_TIME } from './hub.js';
+import { isTouch, TOUCH, initTouch, showTouch, updateTouch } from './touch.js';
+import { VFX, ease, isDark } from './vfx.js';
 import { buildCookie, buildDragon, buildMoon, heartMesh } from './models.js';
 import { poseBone } from './dragonglb.js';
 import { tex, loadManifest } from './tex.js';
 import * as ui from './ui.js';
 
 /* ================= 상수 / 유틸 ================= */
-const W = 1760, H = 992, PAD = 30, S = .04;                // 로직 좌표 → 월드 (1px = 0.04)
+let W = 3400, H = 1900; const PAD = 30, S = .04;                // 로직 좌표 → 월드 (1px = 0.04)
+const SIL = 0x0c0a12;   // 사일런트솔트 스킬 이펙트 색 (검정 계열)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
@@ -39,11 +43,12 @@ function hurt(src, t, n, o = {}) {
   if (t.drT > 0) d *= 1 - t.drV;
   let hpD = d; if (t.shield > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; hpD = d - ab; }
   t.hp = Math.max(0, t.hp - hpD); t.flash = .12;
+  if (B.raid && t === B.raid.boss && src === B.fighters[0]) B.raid.dmg += d;
   if (src && src !== t && src.def.ult && !src.hidden) src.gauge = Math.min(100, src.gauge + n / (src.def.ult.need / 100));
   const big = d >= 800;
   if (!o.quiet) {
     ui.pop(P3(t, 2.6), Math.round(d), src ? src.def.color : '#fff', big);
-    hitFX(t, src ? src.def.color : 0xffffff, big, o.dir);
+    hitFX(t, src ? (src.def.fx ?? src.def.color) : 0xffffff, big, o.dir);
     if (big) { B.hitstop = Math.max(B.hitstop, .07); shake(.35, .25); }
   }
   if (!o.field && t.cast && t.cast.type === 'field') endField(t);
@@ -69,10 +74,11 @@ const silenceOn = (t, s) => t.st.silence = Math.max(t.st.silence, s);
 const waveGeo = new THREE.PlaneGeometry(1, 1);
 function projVisual(p) {
   const g = new THREE.Group(), col = new THREE.Color(p.color);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: p.color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const nb = isDark(p.color) ? THREE.NormalBlending : THREE.AdditiveBlending;
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: p.color, transparent: true, depthWrite: false, blending: nb }));
   glow.scale.setScalar(p.r * S * 9); g.add(glow);
   if (p.kind === 'wave') {   // 침묵의 검기: 직립 초승달
-    const m = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ map: tex('slash'), color: 0xdfe8ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ map: tex('slash'), color: isDark(p.color) ? p.color : 0xdfe8ff, transparent: true, depthWrite: false, blending: nb, side: THREE.DoubleSide }));
     m.scale.set(p.r * S * 11, p.r * S * 8, 1); m.position.y = .2; g.add(m); g.userData.mesh = m;
     const m2 = m.clone(); m2.material = m.material.clone(); m2.material.color.set(p.color); m2.scale.multiplyScalar(1.25); g.add(m2);
   } else if (p.kind === 'heart') {
@@ -137,18 +143,18 @@ function zone(f, o) {
   B.zones.push(z);
 }
 function erupt(pos, r, color, h = 16) {                      // 기둥 폭발 이펙트
-  const c = pos.clone();
+  const c = pos.clone(), WH = isDark(color) ? 0x050408 : 0xffffff;
   vfx.column(c, { r: r * 1.0, h, dur: .9, color });
-  vfx.column(c, { r: r * .55, h: h * 1.2, dur: .7, color: 0xffffff });
+  vfx.column(c, { r: r * .55, h: h * 1.2, dur: .7, color: WH });
   vfx.ring(c, { r0: .5, r1: r * 1.7, dur: .55, color, alpha: 1 });
-  vfx.ring(c, { r0: .3, r1: r * 2.4, dur: .8, color: 0xffffff, alpha: .6 });
+  vfx.ring(c, { r0: .3, r1: r * 2.4, dur: .8, color: WH, alpha: .6 });
   vfx.decal(c, { tex: 'crack', r: r * 1.3, color, dur: 1.4, alpha: .9, y: .04 });
   vfx.flash(c.clone().setY(1), { size: r * 4, color, dur: .35, grow: true });
   for (let i = 0; i < 70; i++) { // 나선 상승 입자
     const a = rnd(0, 6.283), d = rnd(0, r);
-    vfx.emit('glow', { x: c.x + Math.cos(a) * d, y: .2, z: c.z + Math.sin(a) * d, vx: -Math.sin(a) * rnd(2, 5), vy: rnd(8, 22), vz: Math.cos(a) * rnd(2, 5), life: rnd(.5, 1.1), s0: rnd(.4, .9), s1: 0, c0: 0xffffff, c1: color, drag: .6 });
+    vfx.emit('glow', { x: c.x + Math.cos(a) * d, y: .2, z: c.z + Math.sin(a) * d, vx: -Math.sin(a) * rnd(2, 5), vy: rnd(8, 22), vz: Math.cos(a) * rnd(2, 5), life: rnd(.5, 1.1), s0: rnd(.4, .9), s1: 0, c0: WH, c1: color, drag: .6 });
   }
-  vfx.burst('spark', c.clone().setY(.4), 40, { speed: 6, speed2: 16, life: .6, life2: 1.2, size: .45, c0: 0xffffff, c1: color, grav: 8, flat: false });
+  vfx.burst('spark', c.clone().setY(.4), 40, { speed: 6, speed2: 16, life: .6, life2: 1.2, size: .45, c0: WH, c1: color, grav: 8, flat: false });
   shake(.55, .35);
 }
 function updZones(dt) {
@@ -175,37 +181,37 @@ function updZones(dt) {
 /* ================= 침묵의 심판 (필드) ================= */
 function startField(f) {
   const c = f.cast = { type: 'field', x: f.x, y: f.y, r: 230, t: 0, acc: 0 };
-  const p = P3(f), R = c.r * S, col = 0xb8c8ff;
+  const p = P3(f), R = c.r * S, col = SIL;
   c.dome = vfx.dome(p, R, col);
   c.rune = vfx.decal(p, { tex: 'rune', r: R * 1.02, color: col, alpha: .85, spin: .25 });
-  c.rune2 = vfx.decal(p, { tex: 'rune', r: R * .62, color: 0xffffff, alpha: .5, spin: -.5, y: .06 });
-  c.ring = vfx.decal(p, { tex: 'ring', r: R * 1.0, color: 0xffffff, alpha: .9, y: .07 });
-  c.col = vfx.column(p, { r: 1.1, h: 40, dur: 0, color: col }); c.col.dur = 0; c.col.fn = (u, ob, dt) => { ob.rotation.y += dt * 2; ob.scale.set(1.1 + Math.sin(B.time * 4) * .1, 40, 1.1); ob.material.opacity = .45; };
-  vfx.ring(p, { r0: 1, r1: R * 1.5, dur: .8, color: col }); vfx.ring(p, { r0: 1, r1: R * 1.1, dur: 1.1, color: 0xffffff, alpha: .6 });
+  c.rune2 = vfx.decal(p, { tex: 'rune', r: R * .62, color: SIL, alpha: .7, spin: -.5, y: .06 });
+  c.ring = vfx.decal(p, { tex: 'ring', r: R * 1.0, color: SIL, alpha: .95, y: .07 });
+  c.col = vfx.column(p, { r: 1.1, h: 40, dur: 0, color: col }); c.col.dur = 0; c.col.fn = (u, ob, dt) => { ob.rotation.y += dt * 2; ob.scale.set(1.1 + Math.sin(B.time * 4) * .1, 40, 1.1); ob.material.opacity = .6; };
+  vfx.ring(p, { r0: 1, r1: R * 1.5, dur: .8, color: col }); vfx.ring(p, { r0: 1, r1: R * 1.1, dur: 1.1, color: SIL, alpha: .8 });
   vfx.burst('glow', P3(f, .5), 60, { speed: 4, speed2: 14, life: .8, life2: 1.6, size: 1, c0: 0xffffff, c1: col, flat: true, drag: 1.2 });
-  shake(.7, .5); B.hitstop = .1; ui.flash('#cfd8ff', .5, .3); ui.vignette(true);
+  shake(.7, .5); B.hitstop = .1; ui.flash('#07050b', .5, .45); ui.vignette(true);
   f.pose = 'stab';
 }
 function endField(f) {
   if (!f.cast || f.cast.type !== 'field') return;
   const c = f.cast, s = f.def.skills[f.form].v; f.cast = null; f.cd.v = s.cd; f.pose = null;
   c.dome.closing = true; ['rune', 'rune2', 'ring', 'col'].forEach(k => vfx.remove(c[k]));
-  const p = P3(c); vfx.ring(p, { r0: c.r * S, r1: c.r * S * 1.3, dur: .6, color: 0xcfd8ff }); vfx.burst('glow', p.clone().setY(1), 50, { speed: 3, speed2: 12, life: 1, size: .9, c0: 0xcfd8ff, flat: true });
+  const p = P3(c); vfx.ring(p, { r0: c.r * S, r1: c.r * S * 1.3, dur: .6, color: SIL }); vfx.burst('glow', p.clone().setY(1), 50, { speed: 3, speed2: 12, life: 1, size: .9, c0: SIL, flat: true });
   ui.vignette(false);
 }
 function updField(f, dt) {
   const c = f.cast; c.t += dt; c.acc += dt;
   const R = c.r * S, p = P3(c);
   // 침묵의 눈송이 (천천히 하강)
-  for (let i = 0; i < 3; i++) { const a = rnd(0, 6.283), d = Math.sqrt(Math.random()) * R; vfx.emit('glow', { x: p.x + Math.cos(a) * d, y: rnd(8, 14), z: p.z + Math.sin(a) * d, vx: 0, vy: -rnd(2, 4), vz: 0, life: 3.2, s0: rnd(.15, .35), s1: .1, c0: 0xe8eeff, c1: 0x8fa4ff, a: .8, drag: 0 }); }
-  if (Math.random() < .5) { const a = rnd(0, 6.283); vfx.emit('spark', { x: p.x + Math.cos(a) * R, y: .2, z: p.z + Math.sin(a) * R, vy: rnd(3, 8), life: 1, s0: .6, s1: 0, c0: 0xcfd8ff, drag: 0 }); }
+  for (let i = 0; i < 3; i++) { const a = rnd(0, 6.283), d = Math.sqrt(Math.random()) * R; vfx.emit('glow', { x: p.x + Math.cos(a) * d, y: rnd(8, 14), z: p.z + Math.sin(a) * d, vx: 0, vy: -rnd(2, 4), vz: 0, life: 3.2, s0: rnd(.15, .35), s1: .1, c0: 0x16121f, c1: 0x8fa4ff, a: .8, drag: 0 }); }
+  if (Math.random() < .5) { const a = rnd(0, 6.283); vfx.emit('spark', { x: p.x + Math.cos(a) * R, y: .2, z: p.z + Math.sin(a) * R, vy: rnd(3, 8), life: 1, s0: .6, s1: 0, c0: SIL, drag: 0 }); }
   for (const o of B.fighters) {
     if (o === f || o.hp <= 0) continue;
     if (Math.hypot(o.x - c.x, o.y - c.y) < c.r + o.r) {           // 영역 안: 이동·스킬 불가, 초당 500
       o.st.lock = .15; hurt(f, o, 500 * dt, { field: true, quiet: true });
       o.fieldAcc = (o.fieldAcc || 0) + 500 * dt * dmgMul(f);
-      if (o.fieldAcc >= 500) { o.fieldAcc -= 500; ui.pop(P3(o, 2.6), '500', '#cfd8ff'); hitFX(o, 0xcfd8ff, false); }
-      if (Math.random() < .5) vfx.emit('spark', { x: o.root.position.x + rnd(-.6, .6), y: 1 + rnd(0, 1.6), z: o.root.position.z + rnd(-.6, .6), vy: 2, life: .5, s0: .4, s1: 0, c0: 0xcfd8ff });
+      if (o.fieldAcc >= 500) { o.fieldAcc -= 500; ui.pop(P3(o, 2.6), '500', '#cfd8ff'); hitFX(o, SIL, false); }
+      if (Math.random() < .5) vfx.emit('spark', { x: o.root.position.x + rnd(-.6, .6), y: 1 + rnd(0, 1.6), z: o.root.position.z + rnd(-.6, .6), vy: 2, life: .5, s0: .4, s1: 0, c0: SIL });
     }
   }
 }
@@ -360,12 +366,12 @@ function updateCut(dt) {
 /* ================= 캐릭터 정의 ================= */
 const CHARS = {};
 CHARS.silent = {
-  id: 'silent', name: '사일런트솔트 쿠키', color: 0xcfd8ff, cost: 0, hp: 30000, pref: 3.6, atkRange: 100, tag: '침묵 · 근접 검사',
+  id: 'silent', name: '사일런트솔트 쿠키', color: 0xcfd8ff, fx: SIL, cost: 0, hp: 30000, pref: 3.6, atkRange: 100, tag: '침묵 · 근접 검사',
   skills: {
     base: {
-      a: { name: '검 베기', cd: .45, desc: '검으로 벤다. 데미지 100', use(f) { setAnim(f, 'slash', .26); swing(f, 95, .9, 100, 0xcfd8ff); } },
-      z: { name: '침묵의 기운', cd: 5, desc: '지정한 곳에서 침묵의 기운이 솟구침. 데미지 1000 + 슬로우', use(f, p) { setAnim(f, 'cast', .5); const q = clampRange(f, p, 650); zone(f, { x: q.x, y: q.y, r: 95, delay: .6, dmg: 1000, color: 0xb8c8ff, onHit: t => slowOn(t, 3, .5) }); } },
-      x: { name: '침묵의 검기', cd: 7, desc: '침묵의 검기를 발사. 데미지 1500, 적중 시 2초간 스킬 사용 불가', use(f) { setAnim(f, 'slash', .3); shoot(f, { a: f.face, sp: 760, r: 20, dmg: 1500, color: 0x9fb8ff, kind: 'wave', life: 1.4, onHit: t => { silenceOn(t, 2); ui.pop(P3(t, 3.2), '🔇 침묵', '#cfd8ff'); vfx.ring(P3(t), { r1: 3, color: 0xcfd8ff }); } }); } },
+      a: { name: '검 베기', cd: .85, desc: '검으로 벤다. 데미지 100', use(f) { setAnim(f, 'slash', .26); swing(f, 95, .9, 100, SIL); } },
+      z: { name: '침묵의 기운', cd: 5, desc: '지정한 곳에서 침묵의 기운이 솟구침. 데미지 1000 + 슬로우', use(f, p) { setAnim(f, 'cast', .5); const q = clampRange(f, p, 650); zone(f, { x: q.x, y: q.y, r: 95, delay: .6, dmg: 1000, color: SIL, onHit: t => slowOn(t, 3, .5) }); } },
+      x: { name: '침묵의 검기', cd: 7, desc: '침묵의 검기를 발사. 데미지 1500, 적중 시 2초간 스킬 사용 불가', use(f) { setAnim(f, 'slash', .3); shoot(f, { a: f.face, sp: 760, r: 20, dmg: 1500, color: SIL, kind: 'wave', life: 1.4, onHit: t => { silenceOn(t, 2); ui.pop(P3(t, 3.2), '🔇 침묵', '#a89fc8'); vfx.ring(P3(t), { r1: 3, color: SIL }); } }); } },
       c: { name: '적막의 종언', cd: 35, desc: '[컷신] 달을 반으로 베어버린다. 광역 3000', use(f) { startCut(f, '적막의 종언', () => { for (const t of B.fighters) if (t !== f) hurt(f, t, 3000); }); } },
       v: { name: '침묵의 심판', cd: 25, desc: '검을 꽂아 침묵의 영역 생성. 영역 내 시전자 외 모두 이동·스킬 불가, 초당 500. 피격 시/재입력 시 해제', use(f) { if (f.cast && f.cast.type === 'field') { endField(f); return true; } startField(f); return 'nocd'; } },
     }
@@ -376,7 +382,7 @@ CHARS.lich = {
   awake: { wins: 3, desc: '리치드래곤 쿠키로 3승' }, dragon: { hp: 52000 },
   skills: {
     base: {
-      a: { name: '자줏빛 하트', cd: .5, desc: '자줏빛 하트를 발사. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 560, r: 11, dmg: 120, color: 0xff7ae0, kind: 'heart' }); } },
+      a: { name: '자줏빛 하트', cd: .95, desc: '자줏빛 하트를 발사. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 520, r: 11, dmg: 120, color: 0xff7ae0, kind: 'heart', life: 1.05 }); } },
       z: {
         name: '큐트 엑스', cd: 6, desc: '도끼를 들고 이리저리 빠르게 베어버림. 광역 총 1500', use(f) {
           const e = foe(f), steps = [];
@@ -417,7 +423,7 @@ CHARS.lich = {
       },
     },
     dragon: {     // ※ 변신 후 스킬은 임시 스펙입니다 (스펙 전달받으면 교체)
-      a: { name: '용의 숨결', cd: .5, desc: '(임시) 3갈래 불꽃. 각 160', use(f) { setAnim(f, 'breath', .35); for (const d of [-.2, 0, .2]) shoot(f, { a: f.face + d, sp: 620, r: 14, dmg: 160, color: 0xb05aff, kind: 'fire', life: .7 }); } },
+      a: { name: '용의 숨결', cd: .95, desc: '(임시) 3갈래 불꽃. 각 160', use(f) { setAnim(f, 'breath', .35); for (const d of [-.2, 0, .2]) shoot(f, { a: f.face + d, sp: 620, r: 14, dmg: 160, color: 0xb05aff, kind: 'fire', life: .7 }); } },
       z: { name: '꼬리 휩쓸기', cd: 7, desc: '(임시) 주변 광역 2500 + 슬로우', use(f) { setAnim(f, 'tail', .5); const p = P3(f); vfx.slashGround(p, 0, { len: 9, color: 0xc46bff, dur: .5, from: 2.5 }); vfx.slashGround(p, Math.PI, { len: 9, color: 0xffffff, dur: .5, from: 2.5 }); shock(f, 220, 0xc46bff, 2500, t => slowOn(t, 2)); shake(.7, .4); } },
       x: { name: '암흑 브레스', cd: 10, desc: '(임시) 관통 광선 2000', use(f) { setAnim(f, 'breath', .9); shoot(f, { a: f.face, sp: 900, r: 42, dmg: 2000, pierce: true, color: 0xa040ff, kind: 'beam', life: 1.1 }); shake(.6, .5); ui.flash('#a040ff', .3, .3); } },
       c: { name: '용의 포효', cd: 30, desc: '(임시) 광역 3500 + 1.5초 기절', use(f) { setAnim(f, 'roar', 1); shake(1, .8); camFov = 14; for (let i = 0; i < 3; i++) vfx.ring(P3(f), { r0: 1, r1: 440 * S * (.6 + i * .25), dur: .6 + i * .2, color: i ? 0xffffff : 0xc46bff }); ui.flash('#c46bff', .5, .6); shock(f, 440, 0xa040ff, 3500, t => t.st.stun = 1.5); } },
@@ -429,7 +435,7 @@ function placeholder(id, name, color, cost, hp, tag) {
   return {
     id, name, color, cost, hp, pref: 5.5, atkRange: 380, tag: tag + ' (스펙 대기)', tmp: true, skills: {
       base: {
-        a: { name: '기본 공격', cd: .5, desc: '(임시) 투사체 110', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 560, r: 10, dmg: 110, color }); } },
+        a: { name: '기본 공격', cd: .95, desc: '(임시) 투사체 110', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 520, r: 10, dmg: 110, color, life: 1 }); } },
         z: { name: '임시 Z', cd: 6, desc: '(임시) 지정 위치 폭발 1100', use(f, p) { setAnim(f, 'cast', .4); const q = clampRange(f, p, 600); zone(f, { x: q.x, y: q.y, r: 100, delay: .5, dmg: 1100, color }); } },
         x: { name: '임시 X', cd: 8, desc: '(임시) 관통 투사체 1400', use(f) { setAnim(f, 'slash', .3); shoot(f, { a: f.face, sp: 700, r: 18, dmg: 1400, pierce: true, color, kind: 'wave' }); } },
         c: { name: '임시 C', cd: 30, desc: '(임시) 광역 2500', use(f) { setAnim(f, 'cast', .5); shock(f, 330, color, 2500); shake(.5, .3); } },
@@ -443,7 +449,7 @@ CHARS.shadow = {
   awake: { wins: 3, desc: '쉐도우밀크 쿠키로 3승 (궁극기 해금)' }, ult: { need: 9000 },
   skills: {
     base: {
-      a: { name: '푸른 구체', cd: .55, desc: '파란 중간 크기 구체 발사. 데미지 100, 피격 시 1% 확률로 슬로우', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 560, r: 15, dmg: 100, color: 0x3a7bff, kind: 'orb', life: 1.7, onHit: t => { if (Math.random() < .01) { slowOn(t, 3, .5); ui.pop(P3(t, 3.2), '🐌 슬로우', '#9fb8ff'); } } }); } },
+      a: { name: '푸른 구체', cd: 1.05, desc: '파란 중간 크기 구체 발사. 데미지 100, 피격 시 1% 확률로 슬로우', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 560, r: 15, dmg: 100, color: 0x3a7bff, kind: 'orb', life: 1.1, onHit: t => { if (Math.random() < .01) { slowOn(t, 3, .5); ui.pop(P3(t, 3.2), '🐌 슬로우', '#9fb8ff'); } } }); } },
       z: { name: '심연의 손길', cd: 12, desc: '푸른 마법진 위로 손과 줄이 내려오고, 진한 푸른 눈들이 생겨 폭발. 머문 시간만큼 데미지(폭발 포함 최대 1500), 슬로우', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 620); makeHex(f, { x: q.x, y: q.y, r: 175 }); } },
       x: { name: '아공간 이동', cd: 14, desc: '아공간으로 들어가 잠시 무적·투명 상태로 이동하며 체력 10% 회복', use(f, p) { startSub(f, p, { dur: 1.4, speed: 330, heal: .1, away: true }); } },
       c: { name: '정신 침투', cd: 30, desc: '4초간 적을 조종해 이동시킴. 용족·정령 쿠키·사일런트솔트 쿠키에게는 불가', use(f) { return startControl(f); } },
@@ -595,10 +601,10 @@ function reviveBody(f) {
   ui.pop(P3(f, 3.6), '몸으로 부활!', '#7dff9b');
 }
 CHARS.sugar = {
-  id: 'sugar', name: '이터널슈가 쿠키', color: 0xff8ad0, cost: 800, hp: 10000, shield: 40000, pref: 5.5, atkRange: 650, tag: '시작 보호막 40,000 · 호수 · 수면 · 설탕 낙원',
+  id: 'sugar', name: '이터널슈가 쿠키', color: 0xff8ad0, cost: 800, hp: 10000, shield: 40000, pref: 5.5, atkRange: 520, tag: '시작 보호막 40,000 · 호수 · 수면 · 설탕 낙원',
   skills: {
     base: {
-      a: { name: '핑크빛 돌', cd: .6, desc: '하늘에서 핑크빛 돌을 떨어뜨림. 데미지 500', use(f, p) { setAnim(f, 'cast', .3); const q = clampRange(f, p, 720); zone(f, { x: q.x, y: q.y, r: 60, delay: .5, dmg: 500, color: 0xff8ad0, rock: true }); } },
+      a: { name: '핑크빛 돌', cd: 1.2, desc: '하늘에서 핑크빛 돌을 떨어뜨림. 데미지 500', use(f, p) { setAnim(f, 'cast', .3); const q = clampRange(f, p, 560); zone(f, { x: q.x, y: q.y, r: 60, delay: .5, dmg: 500, color: 0xff8ad0, rock: true }); } },
       z: { name: '딸기잼 호수', cd: 14, desc: '아주 넓은 딸기잼 호수 생성. 강한 슬로우 + 초당 1000 (5초 유지)', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 560); makeLake(f, { kind: 'lake', x: q.x, y: q.y, r: 300, dur: 5, dps: 1000, slowF: .25, color: 0xd81b4a, hi: 0xff7a9c }); ui.flash('#ff4f7d', .25, .3); } },
       x: { name: '설탕 호수', cd: 8, desc: '일직선으로 광역 핑크빛 설탕 호수를 만들며 데미지. 4000', use(f) { setAnim(f, 'cast', .5); makeLake(f, { kind: 'strip', x: f.x, y: f.y, a: f.face, len: 760, wid: 170, dur: 1.8, dmg: 4000, color: 0xff9ad8, hi: 0xffffff }); } },
       c: { name: '수면', cd: 25, desc: '5초간 수면. 받는 피해 60% 감소, 체력 20% · 보호막 20% 회복', use(f) { startSleep(f); } },
@@ -723,14 +729,14 @@ CHARS.dark = {
   id: 'dark', name: '어둠마녀 쿠키', color: 0xd8202f, cost: 600, hp: 24000, witch: { hp: 60000 }, pref: 5.5, atkRange: 520, tag: '유도 · 흡수 · 변신',
   skills: {
     base: {
-      a: { name: '핏빛 구체', cd: .5, desc: '시뻘건 유도 마법구체를 발사. 범위 안에서만 유도. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 500, r: 12, dmg: 120, color: 0xff2438, kind: 'orb', life: 1.8, homing: 340, turn: 3.6 }); } },
+      a: { name: '핏빛 구체', cd: .95, desc: '시뻘건 유도 마법구체를 발사. 범위 안에서만 유도. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 500, r: 12, dmg: 120, color: 0xff2438, kind: 'orb', life: 1.2, homing: 340, turn: 3.6 }); } },
       z: { name: '진홍의 마법진', cd: 9, desc: '붉은 마법진을 소환하고 구체가 솟구친 뒤 대폭발. 데미지 2500, 적중 시 2초간 스킬 쿨타임이 줄지 않음', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 600); zone(f, { x: q.x, y: q.y, r: 140, delay: 1, dmg: 2500, color: 0xff2438, fancy: true, onHit: t => { t.st.cdfreeze = 2; ui.pop(P3(t, 3.4), '⏳ 쿨타임 정지', '#ff8a8a'); } }); } },
       x: { name: '에너지 흡수진', cd: 20, desc: '붉은 흡수 마법진 소환. 10초간 초당 약 500의 피를 흡수. 기절·넉백을 맞으면 해제', use(f) { if (f.drain) return false; startDrain(f); } },
       c: { name: '광역 폭발 마법', cd: 22, desc: '넓은 범위에 붉은 폭발 마법이 무작위로 연속 폭발. 폭발당 700', use(f) { startRandomBlast(f); } },
       v: { name: '어둠마녀 변신', cd: 40, desc: '25초간 어둠마녀로 변신하고 스킬이 달라짐 (변신 후 스킬은 임시)', use(f) { transformWitch(f); return 'nocd'; } },
     },
     witch: {    // ※ 변신 후 스킬은 임시 스펙입니다 (스펙 전달받으면 교체)
-      a: { name: '핏빛 삼연구', cd: .6, desc: '(임시) 유도 구체 3발. 각 150', use(f) { setAnim(f, 'cast', .25); for (const d of [-.25, 0, .25]) shoot(f, { a: f.face + d, sp: 520, r: 12, dmg: 150, color: 0xff2438, kind: 'orb', life: 1.8, homing: 380, turn: 3.6 }); } },
+      a: { name: '핏빛 삼연구', cd: 1.15, desc: '(임시) 유도 구체 3발. 각 150', use(f) { setAnim(f, 'cast', .25); for (const d of [-.25, 0, .25]) shoot(f, { a: f.face + d, sp: 520, r: 12, dmg: 150, color: 0xff2438, kind: 'orb', life: 1.2, homing: 380, turn: 3.6 }); } },
       z: { name: '진홍 대폭발', cd: 8, desc: '(임시) 지정 위치 대폭발 3500', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 650); zone(f, { x: q.x, y: q.y, r: 170, delay: .9, dmg: 3500, color: 0xff2438, fancy: true }); } },
       x: { name: '피의 광선', cd: 10, desc: '(임시) 관통 광선 2200', use(f) { setAnim(f, 'breath', .7); shoot(f, { a: f.face, sp: 900, r: 40, dmg: 2200, pierce: true, color: 0xff1a2a, kind: 'beam', life: 1.1 }); shake(.5, .4); } },
       c: { name: '핏빛 폭풍', cd: 20, desc: '(임시) 폭발 마법 연속 폭발', use(f) { startRandomBlast(f, 1.5); } },
@@ -844,9 +850,9 @@ function animate(f, dt) {
   const want = Math.PI / 2 - f.face; let d = Math.atan2(Math.sin(want - f.yaw), Math.cos(want - f.yaw)); f.yaw += d * Math.min(1, dt * 16);
   f.root.rotation.y = f.yaw;
   // 모델 전환
-  f.rig.root.visible = !dragon && !f.hidden; if (f.drg) f.drg.root.visible = dragon;
+  f.rig.root.visible = !dragon && !f.hidden && !f.bushHid; if (f.drg) f.drg.root.visible = dragon && !f.bushHid;
   if (dragon) { f.dragonPop = Math.min(1, f.dragonPop + dt * 2.5); const s = ease.out(f.dragonPop); f.drg.root.scale.setScalar(Math.max(.01, s * (1 + Math.sin(f.dragonPop * 9) * .06 * (1 - f.dragonPop)))); }
-  f.blob.scale.setScalar(dragon ? 2 : 1); f.blob.visible = !f.hidden;
+  f.blob.scale.setScalar(dragon ? 2 : 1); f.blob.visible = !f.hidden && !f.bushHid;
   // 피격 플래시 / 상태 색
   const fl = f.flash > 0;
   for (const m of f.mats) { if (fl) { m.emissive.setScalar(.9); m.emissiveIntensity = 1; } else { m.emissive.copy(m.userData.e0); m.emissiveIntensity = m.userData.ei0; } }
@@ -940,7 +946,7 @@ function bindInput() {
   canvas.addEventListener('pointermove', e => { if (drag) { cam.yaw -= e.movementX * .005; cam.pitch = clamp(cam.pitch + e.movementY * .004, .25, 1.45); } });
   const setM = e => { const r = canvas.getBoundingClientRect(); mouse.x = (e.clientX - r.left) / r.width * 2 - 1; mouse.y = -((e.clientY - r.top) / r.height * 2 - 1); };
   canvas.addEventListener('mousemove', setM);
-  canvas.addEventListener('mousedown', e => { setM(e); if (e.button === 0) mouse.down = true; });
+  canvas.addEventListener('mousedown', e => { if (isTouch) return; setM(e); if (e.button === 0) mouse.down = true; });
   addEventListener('mouseup', () => mouse.down = false);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 }
@@ -950,7 +956,7 @@ function updateMouseWorld() {
 }
 function readInput(f) {
   const k = f.ctrl.kind;
-  if (k === 'h1') { const keys = Q1.splice(0), m = camRel((down.KeyD ? 1 : 0) - (down.KeyA ? 1 : 0), (down.KeyS ? 1 : 0) - (down.KeyW ? 1 : 0)); return { mx: m.x, my: m.y, a: !!(down.Space || mouse.down), keys }; }
+  if (k === 'h1') { const keys = Q1.splice(0), tm = TOUCH.mx || TOUCH.my, m = camRel(tm ? TOUCH.mx : (down.KeyD ? 1 : 0) - (down.KeyA ? 1 : 0), tm ? TOUCH.my : (down.KeyS ? 1 : 0) - (down.KeyW ? 1 : 0)); return { mx: m.x, my: m.y, a: !!(down.Space || mouse.down || TOUCH.atk), keys }; }
   if (k === 'h2') { const keys = Q2.splice(0), m = camRel((down.ArrowRight ? 1 : 0) - (down.ArrowLeft ? 1 : 0), (down.ArrowDown ? 1 : 0) - (down.ArrowUp ? 1 : 0)); return { mx: m.x, my: m.y, a: !!down.Enter, keys }; }
   return aiInput(f);
 }
@@ -975,7 +981,13 @@ function aiInput(f) {
 }
 function aimPoint(f) {
   if (f.st.charm > 0 && B.objs.length) { let best = B.objs[0]; for (const o of B.objs) if (dist(f, o) < dist(f, best)) best = o; return best; }
-  if (f.ctrl.kind === 'h1') return { x: mouse.wx, y: mouse.wy };
+  if (f.ctrl.kind === 'h1') {
+    if (isTouch) {   // 터치: 기본은 상대 자동 조준, 스킬 버튼을 드래그해서 뗀 직후에는 그 방향으로 조준
+      const t = TOUCH.aim; if (t && performance.now() < TOUCH.until) { const d = camRel(t.dx / t.m, t.dy / t.m), L = 150 + 580 * clamp(t.m / 70, 0, 1); return { x: f.x + d.x * L, y: f.y + d.y * L }; }
+      return foe(f);
+    }
+    return { x: mouse.wx, y: mouse.wy };
+  }
   return foe(f);
 }
 function tryUse(f, k) {
@@ -1020,6 +1032,16 @@ function updFighter(f, dt) {
   // 달리기 먼지
   if (f.vel > 3 && Math.random() < .5) vfx.emit('smoke', { x: f.root.position.x, y: .1, z: f.root.position.z, vy: .8, life: .5, s0: .5, s1: 1.2, c0: 0x8a80c0, a: .35 });
 }
+// 풀숲: 안에 있는 캐릭터는 상대(AI 대전의 1P 화면)에게 안 보인다. 가까이 있거나 같은 풀숲이거나 방금 맞았으면 보임.
+function updBush() {
+  const bs = B.bushes || [];
+  B.fighters.forEach(f => { f.bush = bs.findIndex(b => dist(f, b) < b.r * .92); });
+  const me = B.fighters[0];
+  B.fighters.forEach(f => {
+    const seen = f === me || B.mode !== 'ai' || f.bush < 0 || f.bush === me.bush || dist(f, me) < 280 || f.flash > 0 || f.cast || f.hp <= 0;
+    f.bushHid = !seen;
+  });
+}
 let camFov = 0;
 function update(dt) {
   B.dt = dt;
@@ -1030,7 +1052,9 @@ function update(dt) {
   if (B.over) return;
   if (B.intro) return;
   B.time += dt;
+  if (B.raid && !B.over) { B.raid.t -= dt; if (B.raid.t <= 0) { B.raid.t = 0; B.over = B.raid.boss; setTimeout(finish, 900); } }
   B.fighters.forEach(f => updFighter(f, dt));
+  updBush();
   updProjs(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt);
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   const dead = B.fighters.find(f => f.hp <= 0);
@@ -1038,6 +1062,7 @@ function update(dt) {
 }
 function finish() {
   if (!B) return;
+  if (B.mode === 'raid') { const r = ui.recordRaid(B.raid.dmg); ui.result(B.over === B.fighters[0] ? '보스 처치!' : '레이드 종료', `이번 피해 ${Math.round(B.raid.dmg).toLocaleString()}${r.isBest ? ' (최고 기록!)' : ''} · 최고 ${r.best.toLocaleString()}`); return; }
   const w = B.over, p1win = w === B.fighters[0]; let sub = '';
   if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.id, p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; } persist(); sub = '+' + gain + ' 코인'; }
   ui.result(B.mode === 'ai' ? (p1win ? '승리!' : '패배...') : (p1win ? '1P 승리!' : '2P 승리!'), sub);
@@ -1053,6 +1078,7 @@ function updateCamera(dt) {
     camState.pos.lerp(g.pos, k); camState.look.lerp(g.look, k);
     camState.fov = lerp(camState.fov, g.fov + camFov, k); camFov = lerp(camFov, 0, 1 - Math.exp(-dt * 6));
   }
+  world.focus(camState.look);
   camera.position.copy(camState.pos);
   if (B.shake > 0) camera.position.add(new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(B.shake * .45));
   camera.lookAt(camState.look); camera.fov = camState.fov; camera.updateProjectionMatrix();
@@ -1072,7 +1098,7 @@ function frame(ts) {
   updateMouseWorld(); update(dt); updateCamera(raw);
   const scale = world.renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
   vfx.update(0, scale);
-  world.update(raw, clock, B.fighters.some(f => f.st.charm > 0));
+  world.update(raw, clock, B.fighters.some(f => f.st.charm > 0)); updateTouch();
   ui.update(B, camera, world.renderer, raw);
   world.composer.render();
 }
@@ -1102,21 +1128,23 @@ function lobbyFrame(dt) {
   r.render(world.scene, camera); r.setScissorTest(false); r.setViewport(0, 0, innerWidth, innerHeight);
 }
 function toLobby() {
-  world.setObstacles([], S, W, H); world.setMind(false); world.setCut(false); world.setParadise(false); world.setLobby(true);
-  ui.showGame(false); world.resize();
+  world.clearMap(); world.setMind(false); world.setCut(false); world.setParadise(false); world.setLobby(true);
+  ui.showGame(false); world.resize(); showTouch(false);
 }
 
 /* ================= 시작 / 종료 ================= */
-export function startBattle(p1, p2, mode) {
+export function startBattle(p1, p2, mode, mapId) {
   cleanup(); lobbyHide(); world.setLobby(false);
+  const map = MAPS.find(m => m.id === mapId) || MAPS[Math.floor(Math.random() * MAPS.length)], L = layoutMap(map); W = map.W; H = map.H; mouse.wx = W / 2; mouse.wy = H / 2;
   B = { fighters: [], projs: [], zones: [], lakes: [], angels: [], hexes: [], mind: null, cut: null, over: null, shake: 0, shakeT: 0, hitstop: 0, mode, time: 0, dt: .016,
-    objs: [{ x: W / 2, y: H * .24, r: 28 }, { x: W / 2, y: H * .76, r: 28 }, { x: W / 2, y: H / 2, r: 24 }, { x: W * .3, y: H * .4, r: 26 }, { x: W * .7, y: H * .6, r: 26 }], intro: true };
-  B.fighters.push(mkFighter(CHARS[p1], W * .12, H / 2, { kind: 'h1' }), mkFighter(CHARS[p2], W - W * .12, H / 2, mode === 'local' ? { kind: 'h2' } : { kind: 'ai' }));
+    objs: L.objs, bushes: L.bushes, map, intro: true };
+  B.fighters.push(mkFighter(CHARS[p1], W * .1, H / 2, { kind: 'h1' }), mkFighter(CHARS[p2], W - W * .1, H / 2, mode === 'local' ? { kind: 'h2' } : { kind: 'ai' }));
+  if (mode === 'raid') { const boss = B.fighters[1]; boss.max = boss.hp = RAID_BOSS_HP; boss.awake = true; B.raid = { t: RAID_TIME, dmg: 0, boss }; }
   B.fighters[1].face = Math.PI; B.fighters[1].yaw = Math.PI / 2 - Math.PI; B.fighters[0].yaw = Math.PI / 2;
-  world.setObstacles(B.objs, S, W, H); world.setMind(false); world.setCut(false);
+  world.setMap(map, L); world.setMind(false); world.setCut(false);
   camState.init = false; camState.fov = 42; camFov = 0;
-  ui.showGame(true); ui.beginBattle(B); world.resize();
-  const bb = B; ui.intro(B.fighters, () => { if (B === bb) { bb.intro = false; ui.toast('전투 시작!'); } });
+  ui.showGame(true); ui.beginBattle(B); world.resize(); showTouch(true, B.fighters[0]);
+  const bb = B; ui.intro(B.fighters, () => { if (B === bb) { bb.intro = false; ui.toast('전투 시작!  ·  ' + map.name); } });
 }
 function cleanup() {
   if (!B) return;
@@ -1131,11 +1159,13 @@ let picked = 'silent';
 export function init() {
   canvas = document.getElementById('cv'); world = createWorld(canvas); camera = world.camera; vfx = new VFX(world.scene, camera);
   loadManifest(); bindInput();
+  initTouch({ press: k => Q1.push(k), toggleCam: () => { if (B) { cam.fit = !cam.fit; ui.toast(cam.fit ? '시점: 둘 다 보기' : '시점: 내 캐릭터 추적'); } } });
+  if (isTouch) { world.setQuality(1); vfx.density = .5; }
   ui.initUI({
     CHARS, ORDER, SAVE, persist, picked: () => picked, pick: id => { picked = id; },
     reset: () => { Object.assign(SAVE, { coins: 0, unlocked: ['silent'], awake: [], wins: {}, totalWins: 0, ev: null }); persist(); },
-    start: (a, b, m) => startBattle(a, b, m), back: () => { cleanup(); ui.hideHud(); toLobby(); },
-    cheat: () => { SAVE.unlocked = [...ORDER]; SAVE.awake = ['lich', 'shadow']; persist(); },
+    start: (a, b, m) => startBattle(a, b, m), raid: () => startBattle(picked, 'shadow', 'raid'), back: () => { cleanup(); ui.hideHud(); toLobby(); },
+    cheat: () => { SAVE.unlocked = [...ORDER]; SAVE.awake = ['lich', 'shadow']; SAVE.hub = SAVE.hub || {}; SAVE.hub.pass = Object.assign({ xp: 0, f: {}, p: {} }, SAVE.hub.pass, { prem: true }); SAVE.hub.shards = (SAVE.hub.shards || 0) + 500; SAVE.tickets = (SAVE.tickets || 0) + 10; persist(); },
   });
   toLobby();
   requestAnimationFrame(frame);

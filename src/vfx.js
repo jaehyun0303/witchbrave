@@ -6,6 +6,10 @@ const C = new THREE.Color(), C2 = new THREE.Color();
 const rnd = (a, b) => a + Math.random() * (b - a);
 const ease = { out: p => 1 - Math.pow(1 - p, 3), in: p => p * p * p, io: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2 };
 export { ease };
+// 어두운 색(검정 계열)은 가산 블렌딩으로는 안 보이므로 일반 블렌딩으로 그린다
+const dk = new THREE.Color();
+export const isDark = c => { dk.set(c); return (dk.r + dk.g + dk.b) / 3 < .22; };
+const blendOf = c => isDark(c) ? THREE.NormalBlending : THREE.AdditiveBlending;
 
 /* ---------- GPU 포인트 파티클 ---------- */
 class Emitter {
@@ -70,7 +74,7 @@ class Emitter {
 const planeGeo = new THREE.PlaneGeometry(1, 1);
 const colGeo = new THREE.CylinderGeometry(1, 1, 1, 40, 1, true).translate(0, .5, 0);
 function addMat(map, color, opacity = 1, extra = {}) {
-  return new THREE.MeshBasicMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, ...extra });
+  return new THREE.MeshBasicMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: blendOf(color), side: THREE.DoubleSide, ...extra });
 }
 
 export class VFX {
@@ -81,9 +85,15 @@ export class VFX {
       spark: new Emitter(scene, 'spark', 2500, THREE.AdditiveBlending),
       heart: new Emitter(scene, 'heart', 600, THREE.AdditiveBlending),
       smoke: new Emitter(scene, 'smoke', 800, THREE.NormalBlending),
+      dglow: new Emitter(scene, 'glow', 1500, THREE.NormalBlending),
+      dspark: new Emitter(scene, 'spark', 800, THREE.NormalBlending),
     };
   }
-  emit(t, o) { if (this.density < 1 && Math.random() > this.density) return; this.em[t].emit(o); }   // density: 낮은 품질에서 입자 일부를 건너뜀
+  emit(t, o) {
+    if (this.density < 1 && Math.random() > this.density) return;
+    if ((t === 'glow' || t === 'spark') && isDark(o.c1 ?? o.c0 ?? 0xffffff)) { o = { ...o, c0: isDark(o.c0 ?? 0xffffff) ? o.c0 : 0x2a2436 }; t = 'd' + t; }
+    this.em[t].emit(o);
+  }   // density: 낮은 품질에서 입자 일부를 건너뜀
   density = 1;
 
   update(dt, scale) {
@@ -165,7 +175,7 @@ export class VFX {
   }
   // 빌보드 스프라이트 섬광
   flash(p, o = {}) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(o.tex || 'glow'), color: o.color ?? 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, rotation: o.rot || 0 }));
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(o.tex || 'glow'), color: o.color ?? 0xffffff, transparent: true, depthWrite: false, blending: blendOf(o.color ?? 0xffffff), rotation: o.rot || 0 }));
     s.position.set(p.x, p.y, p.z); s.renderOrder = 12;
     const sz = o.size ?? 3;
     return this.add(s, o.dur ?? .25, (u, ob) => { const k = sz * (o.grow ? .4 + .6 * ease.out(u) : 1 - u * .5); ob.scale.set(k * (o.sx || 1), k, 1); ob.material.opacity = (1 - u) * (o.a ?? 1); });
@@ -183,7 +193,7 @@ export class VFX {
   }
   // 카메라를 향하는 베기 선 (X 베기 등)
   slashBB(p, o = {}) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('spark'), color: o.color ?? 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, rotation: o.rot ?? 0 }));
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('spark'), color: o.color ?? 0xffffff, transparent: true, depthWrite: false, blending: blendOf(o.color ?? 0xffffff), rotation: o.rot ?? 0 }));
     s.position.set(p.x, p.y, p.z); s.renderOrder = 12;
     const L = o.len ?? 5;
     return this.add(s, o.dur ?? .3, (u, ob) => { const e = ease.out(Math.min(1, u * 3)); ob.scale.set(L * e, .35 * (1 - u) * (o.w ?? 1) + .02, 1); ob.material.opacity = 1 - u; });
@@ -198,7 +208,7 @@ export class VFX {
           float lines=.5+.5*sin(vP.y*18.-uT*2.)*sin(atan(vP.z,vP.x)*14.+uT);
           float base=smoothstep(.0,.35,1.-vP.y)*.12;
           float a=(f*.55+base*.6+lines*.05*f)*uA*.7; gl_FragColor=vec4(uC*(1.+f),a); }`,
-      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: blendOf(color),
     });
     const m = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), mat);
     m.position.set(p.x, 0, p.z); m.scale.setScalar(.01); m.renderOrder = 3;
