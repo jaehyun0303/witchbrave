@@ -18,7 +18,7 @@ export const MODES = [
   { id: 'online', title: '온라인 대전', desc: '서버 매칭 1 vs 1', long: '서버에서 상대를 찾아 1 대 1로 싸웁니다. 곧 열립니다.', chips: ['1 vs 1', '서버 매칭'], ready: false },
   { id: 'cap', title: '3v3 점령', desc: '3 vs 3 거점 점령', long: '곧 열립니다.', chips: ['3 vs 3', '거점 점령'], ready: false },
   { id: 'raid', title: '보스 레이드', desc: '4인 협동 보스 처치', long: '곧 열립니다.', chips: ['4인 협동', '보스 처치'], ready: false },
-  { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: '곧 열립니다.', chips: ['1 vs 1', '먼저 3승'], ready: false },
+  { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: 'AI 상대와 먼저 3승을 먼저 거두는 쪽이 이겨요. 이기면 코인 500, 져도 150.', chips: ['1 vs 1', '먼저 3승'], ready: true },
   { id: 'rank', title: '랭크 매치', desc: '3 vs 3 시즌 랭킹', long: '곧 열립니다.', chips: ['3 vs 3', '시즌 랭킹'], ready: false },
 ];
 const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
@@ -42,6 +42,7 @@ const WEEKLY = [
   { id: 'w3', t: '뽑기 5회 돌리기', k: 'wgachas', n: 5, r: 400 }, { id: 'w4', t: '승리 10번 달성하기', k: 'wwins', n: 10, r: 1000 }, { id: 'w5', t: '경기 25회 플레이하기', k: 'wplays', n: 25, r: 1000 }, { id: 'w6', t: '출석 5일 하기', k: 'watt', n: 5, r: 800 },
 ];
 export const SEASON = { no: 1, name: '찬란한 지식의 봄', part: 1, parts: ['거짓은 심연을 삼키고', '진리는 따스히 세상을 비추리라'], main: ['shadow'] };   // 메인 고등급: 쉐도우밀크 · 퓨어바닐라(미구현) 및 각성
+const EVENT_ONLY = ['shadow'];   // 이벤트 픽업 뽑기에서만 나오는 쿠키 (일반 뽑기 제외)
 const partName = () => SEASON.parts[SEASON.part - 1];
 const TIPS = ['스킬은 적이 모여 있을 때 사용하면 더 효과적이에요.', '맵이 넓어졌어요. 장애물 뒤에서 투사체를 피해 보세요.', '쉐도우밀크의 장막 안에서는 Q로 쉐도우 스텝을 쓸 수 있어요.', '데미지를 많이 넣으면 궁극기 게이지가 차올라요.'];
 
@@ -214,7 +215,7 @@ build.mode = art => {
   };
   cards.forEach((c, i) => c.onclick = () => { if (!MODES[i] || !MODES[i].ready) return soon(); sel = i; paint(); });
   paint();
-  for (const t of ['랭크', '이벤트']) { const b = btnByText(panel, t); if (b) b.onclick = soon; }
+  { const rb = btnByText(panel, '랭크'), eb = btnByText(panel, '이벤트'); if (rb) rb.onclick = () => hub.openProfile('info'); if (eb) eb.onclick = () => hub.openEvent('pick'); }
   bBtn.onclick = () => { st.mode = MODES[sel].id; back(); };
   byLabel(art, '닫기').onclick = back;
   // 상대 선택 (AI 대전의 상대 캐릭터)
@@ -271,7 +272,7 @@ build.events = art => {
   const P = [...art.children].find(e => e.tagName === 'DIV' && parseInt(e.style.width) > 1000 && parseInt(e.style.width) < 1280) || art;
   const tabs = [...P.querySelectorAll(':scope>button[aria-pressed]')].filter(b => b.style.left === '16px');
   const names = { '이벤트': 'weekly', '일일 미션': 'daily', '주간 미션': 'weekly' };
-  tabs.forEach(b => { const t = b.textContent.replace(/\d+/g, '').trim(), on = names[t] === missionTab && t !== '이벤트'; b.setAttribute('aria-pressed', on); b.style.background = on ? '#3ddbb0' : '#ffe4bd'; b.onclick = () => { if (!names[t] || t === '이벤트') return soon(); missionTab = names[t]; open('events'); }; });
+  tabs.forEach(b => { const t = b.textContent.replace(/\d+/g, '').trim(), on = names[t] === missionTab && t !== '이벤트'; b.setAttribute('aria-pressed', on); b.style.background = on ? '#3ddbb0' : '#ffe4bd'; b.onclick = () => { if (t === '이벤트') return hub.openEvent('pick'); if (!names[t]) return soon(); missionTab = names[t]; open('events'); }; });
   const dayTab = tabs.find(b => b.textContent.includes('일일 미션')), nDaily = claimable(DAILY).length; if (dayTab) { const bd = [...dayTab.querySelectorAll('span')].find(s => /^\d+$/.test(s.textContent.trim())); if (bd) { if (nDaily) bd.textContent = nDaily; else bd.remove(); } }
   const box = [...P.querySelectorAll(':scope>div')].find(e => e.style.top === '92px' && e.style.width === '548px');
   const done = list.filter(d => m.claimed[d.id]).length, pts = done * (100 / list.length);
@@ -310,11 +311,12 @@ function draw(n, useTicket) {
   if (useTicket) { if (SAVE.tickets < 1) return toast('뽑기권이 없어요'); SAVE.tickets--; n = 1; } else { if (SAVE.coins < cost) return toast('코인이 부족해요'); SAVE.coins -= cost; }
   const m = ensureSave(SAVE), out = [];
   for (let i = 0; i < n; i++) {
-    m.gachas++; m.wgachas++; hub.hubStat('pulls'); SAVE.pity++; const r = Math.random() * 100, locked = api.ORDER.filter(id => !SAVE.unlocked.includes(id));
+    m.gachas++; m.wgachas++; hub.hubStat('pulls'); SAVE.pity++; const r = Math.random() * 100, locked = api.ORDER.filter(id => !SAVE.unlocked.includes(id) && !EVENT_ONLY.includes(id));
     if ((r < 3 || SAVE.pity >= 30) && locked.length) { const id = locked[Math.floor(Math.random() * locked.length)]; SAVE.unlocked.push(id); SAVE.pity = 0; out.push({ k: 'n', s: api.CHARS[id].name, sub: meta(id).rar + ' · 신규' }); continue; }
     if (r < 3) SAVE.pity = 0;
     const coin = r < 8 ? 1000 : r < 20 ? 500 : r < 50 ? 200 : 100; SAVE.coins += coin; out.push({ k: 'c', s: fmt(coin), sub: '코인' });
   }
+  const lg = SAVE.glog = SAVE.glog || []; const now = new Date(); out.forEach(o => lg.unshift({ t: now.getMonth() + 1 + '/' + now.getDate() + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'), s: o.k === 'n' ? o.s + ' (' + o.sub + ')' : o.s + ' ' + o.sub, n: o.k === 'n' })); lg.length = Math.min(lg.length, 60);
   api.persist(); pop = out; open('gacha');
 }
 build.gacha = art => {
@@ -322,7 +324,7 @@ build.gacha = art => {
   for (const sv of art.querySelectorAll('svg')) if (sv.querySelector('polygon[fill="#3ddbb0"]')) sv.innerHTML = '<circle cx="22" cy="22" r="17" fill="#ffd45c" stroke="#2b1830" stroke-width="3"></circle><circle cx="22" cy="22" r="10" fill="none" stroke="#c47d00" stroke-width="3"></circle>';
   const ph = [...art.querySelectorAll('svg[aria-label="3D 캐릭터 모델 자리"]')]; ph.forEach(x => x.remove());
   setText(art, '별빛 소환', partName()); setText(art, 'D-12', 'PART ' + SEASON.part); setText(art, 'PICK UP', 'PICK UP');
-  const p1 = SEASON.main[0], others = api.ORDER.filter(id => id !== p1), p2 = others.find(id => !SAVE.unlocked.includes(id)) || others[0];
+  const p1 = api.ORDER.find(id => !EVENT_ONLY.includes(id) && !SAVE.unlocked.includes(id)) || api.ORDER.find(id => !EVENT_ONLY.includes(id)), others = api.ORDER.filter(id => id !== p1 && !EVENT_ONLY.includes(id)), p2 = others.find(id => !SAVE.unlocked.includes(id)) || others[0];
   pickupId = p1; setText(art, 'CHARACTER 07', api.CHARS[p1].name); setText(art, 'CHARACTER 07', api.CHARS[p1].name); setText(art, 'CHARACTER 12', api.CHARS[p2].name); setText(art, '전설 · 딜러', meta(p1).rar + ' · ' + meta(p1).group); setText(art, '영웅 · 서포터', meta(p2).rar + ' · ' + meta(p2).group);
   setText(art, '1.2%', '1.5%'); setText(art, '3.0%', '1.5%');
   setText(art, '38 / 90', `${SAVE.pity} / 30`); const pt = textNodes(art).find(t => t.data.includes('회 안에')); if (pt) pt.data = `${Math.max(0, 30 - SAVE.pity)}회 안에 새 캐릭터가 확정으로 나와요.`;
@@ -332,10 +334,20 @@ build.gacha = art => {
   btnByText(art, '1회 뽑기') ? 0 : 0;
   const b1 = [...art.querySelectorAll('button')].find(b => b.textContent.includes('1회 뽑기') && !b.textContent.includes('10회')), b10 = [...art.querySelectorAll('button')].find(b => b.textContent.includes('10회 뽑기')), bt = [...art.querySelectorAll('button')].find(b => b.textContent.includes('티켓 사용'));
   b1.onclick = () => draw(1, false); b10.onclick = () => draw(10, false); bt.onclick = () => draw(1, true);
-  for (const t of ['픽업 뽑기', '일반 뽑기', '코인 뽑기', '확률 정보 상세', '뽑기 기록']) { const b = btnByText(art, t); if (b) b.onclick = soon; }
+  { const pb = btnByText(art, '픽업 뽑기'); if (pb) pb.onclick = () => hub.openEvent('pick'); }
+  for (const t of ['일반 뽑기', '코인 뽑기']) { const b = btnByText(art, t); if (b) b.onclick = soon; }
+  { const rb = btnByText(art, '확률 정보 상세'), lb = btnByText(art, '뽑기 기록');
+    if (rb) rb.onclick = () => modal(art, '확률 정보', [['캐릭터 (미보유 중 하나)', '3%  ·  ' + 30 + '회 안에 확정'], ['코인 1,000 (에픽)', '5%'], ['코인 500 (레어)', '12%'], ['코인 200 (커먼)', '30%'], ['코인 100 (커먼)', '50%'], ['이벤트 픽업', '심연의 조각 뽑기에서 별도 (이벤트 화면)']]);
+    if (lb) lb.onclick = () => { const lg = S().glog || []; modal(art, '뽑기 기록 (최근 60개)', lg.length ? lg.map(x => [x.t, (x.n ? '⭐ ' : '') + x.s]) : [['기록이 없어요', '']]); }; }
   if (pop) { const items = pop; pop = null; busy++; playGacha(art, items.map(gradeOf), () => showResults(art, items)); }
 };
 const gradeOf = it => it.k === 'n' ? rarGrade(it.sub.split(' ')[0]) : (it.g || (parseInt(it.s.replace(/,/g, ''), 10) >= 1000 ? 3 : parseInt(it.s.replace(/,/g, ''), 10) >= 500 ? 2 : 1));
+function modal(art, title, rows) {
+  busy++;   // 3D 미리보기가 창을 가리지 않게
+  const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:rgba(43,24,48,.9);z-index:99;display:flex;align-items:center;justify-content:center';
+  o.innerHTML = `<div style="width:700px;max-height:600px;box-sizing:border-box;border:4px solid #2b1830;border-radius:26px;background:#fff3df;padding:22px 26px;display:flex;flex-direction:column;gap:10px"><div style="font-family:'Black Han Sans','Jua',sans-serif;font-size:34px;color:#2b1830">${title}</div><div style="overflow-y:auto;max-height:420px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:18px;color:#2b1830">${rows.map(r => `<div style="display:flex;justify-content:space-between;gap:20px;padding:8px 2px;border-bottom:2px dashed #d8c8b0"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}</div><button style="align-self:center;width:180px;height:54px;border:4px solid #2b1830;border-radius:20px;background:#ffc233;box-shadow:0 5px 0 #2b1830;font-family:'Jua',sans-serif;font-size:26px;color:#2b1830;cursor:pointer">닫기</button></div>`;
+  o.querySelector('button').onclick = () => { o.remove(); busy = Math.max(0, busy - 1); }; art.appendChild(o);
+}
 function showResults(art, items) {
   const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:rgba(43,24,48,.95);z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px';
   const cards = items.map((it, i) => `<div style="width:${items.length > 5 ? 150 : 190}px;height:${items.length > 5 ? 120 : 150}px;box-sizing:border-box;border:4px solid #2b1830;border-radius:20px;background:${it.k === 'n' ? 'repeating-linear-gradient(45deg,#ffd873 0,#ffd873 14px,#fff3df 14px,#fff3df 28px)' : '#fff3df'};box-shadow:0 5px 0 #2b1830;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:rp .45s ${i * .07}s both"><b style="font-family:'Black Han Sans','Jua',sans-serif;font-size:${it.k === 'n' ? 24 : 32}px;font-weight:400;color:#2b1830;line-height:1.1">${it.s}</b><span style="font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;color:#6b4a63;margin-top:4px">${it.sub}</span></div>`).join('');

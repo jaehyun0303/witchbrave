@@ -31,7 +31,7 @@ let B = null, world, vfx, camera, canvas;
 const foe = f => B.fighters.find(o => o !== f);
 
 /* ================= 데미지 / 상태 ================= */
-const dmgMul = f => (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1);
+const dmgMul = f => (f.pm || 1) * (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1);
 const defRed = f => f.mindBuff ? .05 : 0;
 const spdMul = f => (f.mindBuff ? 1.15 : 1) * (f.form === 'dragon' ? 1.1 : 1);
 const toast = (f, t) => { if (f.ctrl.kind !== 'ai') ui.toast(t); };
@@ -134,7 +134,7 @@ function updProjs(dt) {
 
 /* ================= 장판(지정 위치 폭발) ================= */
 function zone(f, o) {
-  const z = Object.assign({ t: 0, delay: 0, done: false, owner: f }, o);
+  const z = Object.assign({ t: 0, delay: 0, done: false, owner: f }, o); if (f.area) z.r *= f.area;
   const c = P3(z);
   z.tele = vfx.decal(c, { tex: 'rune', r: z.r * S, color: z.color, alpha: .9, spin: 1.5 });
   z.tele2 = vfx.decal(c, { tex: 'ring', r: z.r * S * 1.05, color: z.color, alpha: .8, y: .07 });
@@ -1038,7 +1038,7 @@ function updBush() {
   B.fighters.forEach(f => { f.bush = bs.findIndex(b => dist(f, b) < b.r * .92); });
   const me = B.fighters[0];
   B.fighters.forEach(f => {
-    const seen = f === me || B.mode !== 'ai' || f.bush < 0 || f.bush === me.bush || dist(f, me) < 280 || f.flash > 0 || f.cast || f.hp <= 0;
+    const seen = f === me || (B.mode !== 'ai' && B.mode !== 'duel') || f.bush < 0 || f.bush === me.bush || dist(f, me) < 280 || f.flash > 0 || f.cast || f.hp <= 0;
     f.bushHid = !seen;
   });
 }
@@ -1052,6 +1052,8 @@ function update(dt) {
   if (B.over) return;
   if (B.intro) return;
   B.time += dt;
+  if (B.healer && !B.over) { const h = B.healer; h.t += dt; if (h.t >= h.every) { h.t = 0; const me = B.fighters[0]; if (me.hp > 0) { const v = Math.round(me.max * h.pct); me.hp = Math.min(me.max, me.hp + v); ui.pop(P3(me, 3.4), '+' + v, '#7dff9b', true); vfx.ring(P3(me), { r0: .5, r1: 5, dur: .8, color: 0xfff3a0 }); vfx.column(P3(me), { r: 1.6, h: 12, dur: .9, color: 0xfff3a0, alpha: .7 }); ui.flash('#fff6c0', .5, .25); ui.toast('☀️ 퓨어바닐라 쿠키의 치유!'); } } }
+  if (B.fxT && !B.over) { B.fxT -= dt; if (B.fxT <= 0) { B.over = B.fighters[1]; setTimeout(finish, 600); } }
   if (B.raid && !B.over) { B.raid.t -= dt; if (B.raid.t <= 0) { B.raid.t = 0; B.over = B.raid.boss; setTimeout(finish, 900); } }
   B.fighters.forEach(f => updFighter(f, dt));
   updBush();
@@ -1062,6 +1064,18 @@ function update(dt) {
 }
 function finish() {
   if (!B) return;
+  if (B.fx) { const cb = B.fx.done, win = B.over === B.fighters[0]; cleanup(); ui.hideHud(); toLobby(); cb && cb({ win }); return; }
+  if (B.mode === 'duel') {   // 1v1 결투: 먼저 3승
+    const s = B.series, p1win = B.over === B.fighters[0]; s.w[p1win ? 0 : 1]++;
+    if (s.w[0] < 3 && s.w[1] < 3) {
+      ui.toast(`라운드 ${s.round} ${p1win ? '승리' : '패배'}  ·  ${s.w[0]} : ${s.w[1]}`); s.round++;
+      const bb = B, a = bb.fighters[0].def.id, b = bb.fighters[1].def.id, mid = bb.map.id;
+      setTimeout(() => { if (B === bb) startBattle(a, b, 'duel', mid, s); }, 2200); return;
+    }
+    const win = s.w[0] >= 3, gain = win ? 500 : 150; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.id, win);
+    if (win) { const id = B.fighters[1].def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; } persist();
+    ui.result(win ? '결투 승리!' : '결투 패배...', `${s.w[0]} : ${s.w[1]}  ·  +${gain} 코인`); return;
+  }
   if (B.mode === 'raid') { const r = ui.recordRaid(B.raid.dmg); ui.result(B.over === B.fighters[0] ? '보스 처치!' : '레이드 종료', `이번 피해 ${Math.round(B.raid.dmg).toLocaleString()}${r.isBest ? ' (최고 기록!)' : ''} · 최고 ${r.best.toLocaleString()}`); return; }
   const w = B.over, p1win = w === B.fighters[0]; let sub = '';
   if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.id, p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; } persist(); sub = '+' + gain + ' 코인'; }
@@ -1133,13 +1147,19 @@ function toLobby() {
 }
 
 /* ================= 시작 / 종료 ================= */
-export function startBattle(p1, p2, mode, mapId) {
+export function runFight(foe, fx) { return new Promise(done => startBattle(picked, foe, 'raidfight', fx.map || 'plain', null, { ...fx, done })); }
+export function startBattle(p1, p2, mode, mapId, series, fx) {
   cleanup(); lobbyHide(); world.setLobby(false);
   const map = MAPS.find(m => m.id === mapId) || MAPS[Math.floor(Math.random() * MAPS.length)], L = layoutMap(map); W = map.W; H = map.H; mouse.wx = W / 2; mouse.wy = H / 2;
   B = { fighters: [], projs: [], zones: [], lakes: [], angels: [], hexes: [], mind: null, cut: null, over: null, shake: 0, shakeT: 0, hitstop: 0, mode, time: 0, dt: .016,
-    objs: L.objs, bushes: L.bushes, map, intro: true };
+    objs: L.objs, bushes: L.bushes, map, intro: true, fx: fx || null, series: mode === 'duel' ? (series || { w: [0, 0], round: 1 }) : null };
   B.fighters.push(mkFighter(CHARS[p1], W * .1, H / 2, { kind: 'h1' }), mkFighter(CHARS[p2], W - W * .1, H / 2, mode === 'local' ? { kind: 'h2' } : { kind: 'ai' }));
   if (mode === 'raid') { const boss = B.fighters[1]; boss.max = boss.hp = RAID_BOSS_HP; boss.awake = true; B.raid = { t: RAID_TIME, dmg: 0, boss }; }
+  if (fx) {   // 레이드 전용 전투: 보스 체력/공격력/범위, 시작 체력, 힐러, 제한 시간
+    const foeF = B.fighters[1], me = B.fighters[0]; if (fx.hp) foeF.max = foeF.hp = fx.hp; foeF.pm = fx.pm || 1; foeF.area = fx.area || 1; foeF.awake = true;
+    if (fx.myHp) me.hp = Math.max(1, me.max * fx.myHp); if (fx.myShield) { me.shield = me.shieldMax = fx.myShield; }
+    if (fx.heal) B.healer = { t: 0, every: fx.heal.every, pct: fx.heal.pct }; if (fx.timeout) B.fxT = fx.timeout;
+  }
   B.fighters[1].face = Math.PI; B.fighters[1].yaw = Math.PI / 2 - Math.PI; B.fighters[0].yaw = Math.PI / 2;
   world.setMap(map, L); world.setMind(false); world.setCut(false);
   camState.init = false; camState.fov = 42; camFov = 0;
@@ -1164,10 +1184,10 @@ export function init() {
   ui.initUI({
     CHARS, ORDER, SAVE, persist, picked: () => picked, pick: id => { picked = id; },
     reset: () => { Object.assign(SAVE, { coins: 0, unlocked: ['silent'], awake: [], wins: {}, totalWins: 0, ev: null }); persist(); },
-    start: (a, b, m) => startBattle(a, b, m), raid: () => startBattle(picked, 'shadow', 'raid'), back: () => { cleanup(); ui.hideHud(); toLobby(); },
+    start: (a, b, m) => startBattle(a, b, m), raid: () => startBattle(picked, 'shadow', 'raid'), fight: runFight, back: () => { cleanup(); ui.hideHud(); toLobby(); },
     cheat: () => { SAVE.unlocked = [...ORDER]; SAVE.awake = ['lich', 'shadow']; SAVE.hub = SAVE.hub || {}; SAVE.hub.pass = Object.assign({ xp: 0, f: {}, p: {} }, SAVE.hub.pass, { prem: true }); SAVE.hub.shards = (SAVE.hub.shards || 0) + 500; SAVE.tickets = (SAVE.tickets || 0) + 10; persist(); },
   });
   toLobby();
   requestAnimationFrame(frame);
-  window.WB = { get B() { return B; }, hurt, step: dt => update(dt), startBattle, tryUse, CHARS, SAVE, vfx, world, THREE };
+  window.WB = { get B() { return B; }, runFight, hurt, step: dt => update(dt), startBattle, tryUse, CHARS, SAVE, vfx, world, THREE };
 }

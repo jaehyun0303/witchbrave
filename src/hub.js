@@ -1,6 +1,7 @@
 // 출석 체크 · 시즌 패스 · 이벤트(「거짓은 심연을 삼키고」: 픽업 뽑기 / 이벤트 퀘스트 / 쉐도우밀크 레이드)
 // 목업이 없는 화면이라 로비와 같은 톤(크림 패널 + 진한 테두리)으로 직접 구성한다.
 import { playGacha } from './gachafx.js';
+import { runRaid, rewardLeft } from './raid.js';
 
 export const SHARD = '심연의 조각';
 const PASS_MAX = 30, PASS_XP = 100, PITY = 40, RAID_TRIES = 3;
@@ -37,7 +38,7 @@ export function H() {
   const S = SV(), h = S.hub = S.hub || {};
   h.shards ??= 0; h.pity ??= 0; h.pv ??= 0;
   h.att ??= { n: 0, last: '' }; h.pass ??= { xp: 0, f: {}, p: {}, prem: false };
-  h.stat ??= { plays: 0, raids: 0, pulls: 0 }; h.ac ??= {}; h.tc ??= {};
+  h.rd ??= { last: 0, clears: 0 }; h.stat ??= { plays: 0, raids: 0, pulls: 0 }; h.ac ??= {}; h.tc ??= {};
   h.q ??= { day: '', wk: 0, c: {} }; h.raid ??= { best: 0, total: 0, day: '', tries: 0, c: {} };
   const q = h.q;
   if (q.day !== today()) { q.day = today(); q.plays = q.wins = q.raids = q.pulls = 0; EV_DAILY.forEach(d => delete q.c[d.id]); h.raid.day = today(); h.raid.tries = 0; }
@@ -57,7 +58,7 @@ export function hubRaid(dmg) {
 }
 export const raidTriesLeft = () => Math.max(0, RAID_TRIES - H().raid.tries);
 const mi = () => { const S = SV(); S.mi = S.mi || {}; return S.mi; };
-const evClaimable = () => [...EV_DAILY, ...EV_WEEKLY].filter(d => H().q[d.k] >= d.n && !H().q.c[d.id]).length + RAID_TIERS.filter(t => H().raid.best >= t.n && !H().raid.c[t.id]).length;
+const evClaimable = () => [...EV_DAILY, ...EV_WEEKLY].filter(d => H().q[d.k] >= d.n && !H().q.c[d.id]).length + (rewardLeft(SV(), H) === 0 ? 1 : 0);
 export const eventBadge = evClaimable;
 export const attendReady = () => H().att.last !== today();
 export const passClaimable = () => { const h = H(), lv = passLevel(); let n = 0; for (let l = 1; l <= lv; l++) { if (!h.pass.f[l]) n++; if (h.pass.prem && !h.pass.p[l]) n++; } return n; };
@@ -140,7 +141,7 @@ const EVBG = 'radial-gradient(circle at 18% 8%,#2c52e0 0,#10267a 38%,#050a2a 100
 export function openEvent(t) {
   if (t) tab = t; const h = H();
   const tabs = [['pick', '픽업 뽑기'], ['quest', '이벤트 퀘스트'], ['raid', '쉐도우밀크 레이드']];
-  const dots = { quest: [...EV_DAILY, ...EV_WEEKLY].filter(d => h.q[d.k] >= d.n && !h.q.c[d.id]).length, raid: RAID_TIERS.filter(x => h.raid.best >= x.n && !h.raid.c[x.id]).length };
+  const dots = { quest: [...EV_DAILY, ...EV_WEEKLY].filter(d => h.q[d.k] >= d.n && !h.q.c[d.id]).length, raid: rewardLeft(SV(), H) === 0 ? 1 : 0 };
   const tb = tabs.map(([k, n], i) => `<button data-t="${k}" style="position:absolute;left:${40 + i * 214}px;top:98px;width:204px;height:48px;${BTN(tab === k ? '#ffc233' : '#ffe4bd')};font-size:21px">${n}${dots[k] ? `<span style="position:absolute;right:-6px;top:-8px;min-width:24px;height:24px;border-radius:12px;background:#ff3b5c;border:3px solid #2b1830;color:#fff;font-size:14px;line-height:18px">${dots[k]}</span>` : ''}</button>`).join('');
   const body = tab === 'pick' ? evPick() : tab === 'quest' ? evQuest() : evRaid();
   mount('event', head('거짓은 심연을 삼키고', '시즌 1 · PART 1 이벤트 — 쉐도우밀크 쿠키 · 퓨어바닐라 쿠키 픽업', EVBG) + tb + panel(40, 160, 1200, 530, body), '#10267a');
@@ -207,24 +208,19 @@ function bindQuest() {
 }
 
 function evRaid() {
-  const h = H(), r = h.raid, left = raidTriesLeft();
-  const tier = (t, i) => {
-    const ok = r.best >= t.n, has = r.c[t.id];
-    return `<div style="position:absolute;left:0;top:${i * 66}px;width:690px;height:58px;box-sizing:border-box;border:3px solid #2b1830;border-radius:16px;background:#fff;box-shadow:0 3px 0 #2b1830;${FONT};color:#2b1830">
-      <div style="position:absolute;left:14px;top:14px;font-size:21px">${fmt(t.n)} 피해</div><div style="position:absolute;left:190px;top:18px;font-size:16px;color:#6b4a63">${rtxt(t.r)}</div>
-      <button data-r="${t.id}" style="position:absolute;right:10px;top:7px;width:104px;height:38px;${BTN(has ? '#bde8cf' : ok ? '#ffc233' : '#e6e0ee')};font-size:17px;${ok && !has ? '' : 'cursor:default'}">${has ? '완료' : ok ? '받기' : '🔒'}</button></div>`;
-  };
-  return `<div style="position:absolute;left:24px;top:22px;width:420px;height:470px;box-sizing:border-box;border:4px solid #2b1830;border-radius:22px;background:radial-gradient(circle at 50% 30%,#2c52e0,#0a1033);box-shadow:0 4px 0 #2b1830;color:#fff;text-align:center;${FONT}">
-      <div style="font-size:120px;margin-top:34px">🌑</div><div style="${HAN};font-size:34px;${stroke(7)};margin-top:6px">쉐도우밀크 쿠키</div><div style="font-size:18px;color:#bcd0ff;margin-top:4px">거짓의 군주 · HP ${fmt(RAID_BOSS_HP)}</div>
-      <div style="margin:18px 26px 0;font-size:16px;line-height:23px;color:#e6efff">제한 시간 ${RAID_TIME}초 동안 최대한 많은 피해를 입히세요. 가장 높았던 기록으로 보상을 받아요.</div>
-      <div style="margin-top:14px;font-size:20px">최고 기록 <b style="font-weight:400;color:#ffd873">${fmt(r.best)}</b></div><div style="font-size:15px;color:#9ab4ff;margin-top:2px">누적 ${fmt(r.total)}</div></div>
-    <div style="position:absolute;left:470px;top:18px;${HAN};font-size:28px;${stroke(6)}">피해 기록 보상</div><div style="position:absolute;left:470px;top:62px;width:690px;height:400px">${RAID_TIERS.map(tier).join('')}</div>
-    <button id="rgo" style="position:absolute;left:830px;top:464px;width:330px;height:50px;${BTN(left ? '#ff7a8a' : '#cfc6d8')};font-size:25px">${left ? `도전하기 (오늘 ${left}/${RAID_TRIES}회 남음)` : '오늘 도전 횟수를 다 썼어요'}</button>
-    <div style="position:absolute;left:470px;top:466px;${FONT};font-size:14px;color:#6b4a63;width:340px">선택한 캐릭터로 싸워요. 일일 퀘스트로 도전 횟수 대신 조각을 모을 수 있어요.</div>`;
+  const S = SV(), left = rewardLeft(S, H), rd = H().rd, hrs = Math.ceil(left / 36e5);
+  const stage = (n, t, d) => `<div style="display:flex;gap:12px;align-items:center;padding:7px 0;border-bottom:2px dashed #d8c8b0"><div style="flex:none;width:34px;height:34px;border:3px solid #2b1830;border-radius:50%;background:#ffc233;text-align:center;line-height:28px;font-size:18px">${n}</div><div><div style="font-size:20px">${t}</div><div style="font-size:14px;color:#6b4a63">${d}</div></div></div>`;
+  return `<div style="position:absolute;left:24px;top:22px;width:400px;height:470px;box-sizing:border-box;border:4px solid #2b1830;border-radius:22px;background:radial-gradient(circle at 50% 30%,#4a2fb0,#0a0524);box-shadow:0 4px 0 #2b1830;color:#fff;text-align:center;${FONT}">
+      <div style="font-size:110px;margin-top:30px">🗼</div><div style="${HAN};font-size:40px;${stroke(8)};margin-top:4px">거짓의 탑</div><div style="font-size:19px;color:#bcd0ff;margin-top:6px">쉐도우밀크 쿠키 레이드</div>
+      <div style="margin:18px 26px 0;font-size:16px;line-height:24px;color:#e6efff">던전 + 미니게임 + 보스전<br>파티 <b style="color:#ffd873">2명 이상</b> 필요<br><span style="color:#9ab4ff">(지금은 AI 동료와 함께 입장)</span></div>
+      <div style="margin-top:16px;font-size:18px">누적 클리어 <b style="font-weight:400;color:#ffd873">${rd.clears}</b>회</div></div>
+    <div style="position:absolute;left:450px;top:20px;width:720px;${FONT};color:#2b1830"><div style="${HAN};font-size:28px;${stroke(6)};margin-bottom:4px">관문</div>
+      ${stage(1, '거짓의 군주', '압도적인 체력과 공격력의 쉐도우밀크 쿠키 — 이길 수 없다')}${stage(2, '부활의 요거트강', '거짓(틀린 답)으로 10문제에 답해 강을 건너기')}${stage(3, '거짓의 체스', '조종자와 체스말 — 지면 체스말만 쓰러진다')}${stage(4, '거짓의 타로', '카드 짝 맞추기')}${stage(5, '거짓의 동굴', '던전 + 쉐도우밀크 보스(HP 2,000,000), 퓨어바닐라가 주기적으로 치유')}</div>
+    <div style="position:absolute;left:450px;top:400px;width:720px;${FONT};color:#2b1830;font-size:17px;line-height:25px">보상: 클리어 시 <b style="font-weight:400">${SHARD} 100</b>(이벤트 뽑기 10회분)+코인 2,000 · 던전에서 지면 조각 30 · <b style="font-weight:400">24시간마다</b> 한 번</div>
+    <button id="rgo" style="position:absolute;left:450px;top:458px;width:720px;height:54px;${BTN('#ff7a8a')};font-size:26px">${left ? `거짓의 탑 입장 (보상은 ${hrs}시간 뒤에 다시 받을 수 있어요)` : '거짓의 탑 입장하기!'}</button>`;
 }
 function bindRaid() {
-  onAll('button[data-r]', d => { const t = RAID_TIERS.find(x => x.id === d.r), r = H().raid; if (r.c[t.id] || r.best < t.n) return; r.c[t.id] = 1; grant(t.r); ctx.api.persist(); ctx.toast('보상 획득! ' + rtxt(t.r)); openEvent(); });
-  on('rgo', () => { if (!raidTriesLeft()) return ctx.toast('오늘 도전 횟수를 다 썼어요'); ctx.api.raid(); });
+  on('rgo', async () => { await runRaid({ api: ctx.api, H, grant }); openEvent('raid'); });
 }
 
 /* ================= 프로필 · 랭크 · 트로피 로드 · 업적 · 친구 ================= */

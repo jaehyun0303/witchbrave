@@ -11,19 +11,19 @@ export const MAPS = [
   { id: 'plain', name: '달빛 수정 평원', seed: 11, W: 3400, H: 1900,
     floor: 0x7a72b8, rim: 0x6a58ff, edge: 0x9a8aff, fog: [0x120a2a, .0055], sky: [0x050314, 0x241446, 0x0a0618, 0xcfd8ff], hemi: [0x8c88ff, 0x1a1030], moon: 0xb4bfff, bloom: .6,
     pal: { leaf: 0x3a8f7a, trunk: 0x4a3a5a, rock: 0x3b3466, bush: 0x2f9d86, bush2: 0x7be0b8, wall: 0x6a5f9a, accent: 0x8f7bff },
-    n: { crystal: 9, rock: 7, bush: 8 }, decor: ['tuft', 'flower'] },
+    n: { crystal: 9, rock: 7, bush: 12 }, decor: ['tuft', 'flower'] },
   { id: 'forest', name: '마녀의 숲', seed: 23, W: 3800, H: 2100,
     floor: 0x2c5036, rim: 0x2fbf7a, edge: 0x7affb0, fog: [0x0b1a16, .007], sky: [0x02100c, 0x0f3a2a, 0x03140e, 0xb8ffe0], hemi: [0x8fe8b8, 0x0a2018], moon: 0xa8ffd8, bloom: .5,
     pal: { leaf: 0x2f8f5a, trunk: 0x5a3f2a, rock: 0x4a5a52, bush: 0x2a9a4a, bush2: 0x8ae86a, wall: 0x5a6a5a, accent: 0xb8ff7a },
-    n: { tree: 13, rock: 6, bush: 14 }, decor: ['tuft', 'mush'] },
+    n: { tree: 13, rock: 6, bush: 20 }, decor: ['tuft', 'mush'] },
   { id: 'ruins', name: '고대 폐허', seed: 37, W: 3400, H: 1900,
     floor: 0xb8a98a, rim: 0xd8a460, edge: 0xffd9a0, fog: [0x2a1f18, .005], sky: [0x1c0e12, 0x7a4a3a, 0x1a0e0e, 0xffe0b8], hemi: [0xffe2c0, 0x2a1c14], moon: 0xffd8a8, bloom: .45,
     pal: { leaf: 0x6a8a4a, trunk: 0x5a4a3a, rock: 0x8a7a64, bush: 0x5f8f3a, bush2: 0xb8d86a, wall: 0xa8987a, accent: 0xffc060 },
-    n: { pillar: 12, wall: 6, rock: 4, bush: 8 }, decor: ['tuft', 'pebble'] },
+    n: { pillar: 12, wall: 6, rock: 4, bush: 12 }, decor: ['tuft', 'pebble'] },
   { id: 'candy', name: '설탕 언덕', seed: 51, W: 3600, H: 2000,
     floor: 0xffc9e0, rim: 0xff7ac0, edge: 0xffffff, fog: [0xf4b8dc, .0035], sky: [0xff9ad8, 0xffe0f4, 0xffd0ec, 0], hemi: [0xffd6f0, 0xd890c0], moon: 0xfff0f8, bloom: .3,
     pal: { leaf: 0x7be0b0, trunk: 0xffffff, rock: 0xffa6cc, bush: 0x6fe0a8, bush2: 0xc8ffe0, wall: 0xffe0f0, accent: 0xff5fa8 },
-    n: { lolli: 9, candy: 9, bush: 9 }, decor: ['tuft', 'flower'] },
+    n: { lolli: 9, candy: 9, bush: 13 }, decor: ['tuft', 'flower'] },
 ];
 
 /* ---------- 배치 ---------- */
@@ -75,7 +75,7 @@ export function layoutMap(map) {
     props.push({ kind: 'wall', x, y, r: half, len, rot: a, v: 0 });
   });
   // 풀숲: 크고 넓게
-  if (N.bush) place(N.bush, 120, 190, 40, (x, y, r) => bushes.push({ x, y, r }));
+  if (N.bush) place(N.bush, 150, 230, 40, (x, y, r) => bushes.push({ x, y, r }));
   // 장식(충돌 없음, 대칭 아님)
   const decor = [];
   for (const kind of map.decor) {
@@ -141,30 +141,31 @@ export function buildProp(map, p) {
   return g;
 }
 
-// 풀숲: 흔들리는 풀잎 수십 개를 InstancedMesh 하나로
+// 풀숲: 키 큰 풀잎을 빽빽하게 InstancedMesh 하나로. 흔들림은 셰이더에서 처리해서 CPU 비용이 없다.
+const BUSH_T = { value: 0 };
+const bushMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .95, flatShading: true });
+bushMat.onBeforeCompile = sh => {
+  sh.uniforms.uT = BUSH_T;
+  sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3(position);
+    float sw = position.y * position.y * .035; vec4 ip = instanceMatrix[3];
+    transformed.x += sin(uT * 1.7 + ip.x * .8 + ip.z * .5) * sw; transformed.z += cos(uT * 1.4 + ip.z * .7 + ip.x * .3) * sw;`);
+};
 export function buildBush(map, b, seed) {
-  const g = new THREE.Group(), R = rng(seed * 977 + 13), n = Math.round(b.r * b.r / 280), w = b.r * S;
-  const base = new THREE.Mesh(new THREE.CircleGeometry(w * 1.02, 28), new THREE.MeshBasicMaterial({ color: map.pal.bush, transparent: true, opacity: .32, depthWrite: false }));
-  base.rotation.x = -Math.PI / 2; base.position.y = .04; g.add(base);
-  const geo = new THREE.ConeGeometry(.2, 1.7, 4); geo.translate(0, .85, 0);
-  const im = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, flatShading: true }), n);
-  const c1 = new THREE.Color(map.pal.bush), c2 = new THREE.Color(map.pal.bush2), col = new THREE.Color();
-  const data = [];
+  const g = new THREE.Group(), R = rng(seed * 977 + 13), n = Math.round(b.r * b.r / 85), w = b.r * S;
+  const dark = new THREE.Color(map.pal.bush).multiplyScalar(.55);
+  const base = new THREE.Mesh(new THREE.CircleGeometry(w * 1.04, 32), new THREE.MeshBasicMaterial({ color: dark, transparent: true, opacity: .85, depthWrite: false }));
+  base.rotation.x = -Math.PI / 2; base.position.y = .05; g.add(base);
+  const geo = new THREE.ConeGeometry(.26, 2.6, 4); geo.translate(0, 1.3, 0);
+  const im = new THREE.InstancedMesh(geo, bushMat, n);
+  const c1 = new THREE.Color(map.pal.bush).multiplyScalar(.75), c2 = new THREE.Color(map.pal.bush2).multiplyScalar(.8), col = new THREE.Color();
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
   for (let i = 0; i < n; i++) {
-    const a = R() * 6.283, d = Math.sqrt(R()) * w * .96;
-    data.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: .8 + R() * 1.0, ry: R() * 6, ph: R() * 6.28 });
-    col.copy(c1).lerp(c2, R() * .8); im.setColorAt(i, col);
+    const a = R() * 6.283, d = Math.sqrt(R()) * w * .98;
+    e.set((R() - .5) * .3, R() * 6, (R() - .5) * .3); q.setFromEuler(e); sc.set(1, .85 + R() * .6, 1); ps.set(Math.cos(a) * d, 0, Math.sin(a) * d); m4.compose(ps, q, sc); im.setMatrixAt(i, m4);
+    col.copy(c1).lerp(c2, R() * R()); im.setColorAt(i, col);
   }
   im.castShadow = false; im.receiveShadow = false; g.add(im);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
-  g.userData.update = t => {
-    for (let i = 0; i < n; i++) {
-      const d = data[i]; e.set(Math.sin(t * 1.6 + d.ph) * .14, d.ry, Math.cos(t * 1.3 + d.ph * 1.7) * .14); q.setFromEuler(e);
-      sc.set(1, d.s, 1); ps.set(d.x, 0, d.z); m4.compose(ps, q, sc); im.setMatrixAt(i, m4);
-    }
-    im.instanceMatrix.needsUpdate = true;
-  };
-  g.userData.update(0);
+  g.userData.update = t => { BUSH_T.value = t; };
   return g;
 }
 

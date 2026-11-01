@@ -91,7 +91,7 @@ export function update(B, camera, renderer, dt) {
     p.el.style.transform = `translate(${(v3.x * .5 + .5) * w + p.dx}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-50%) scale(${(1 + Math.max(0, .25 - p.t) * 4) * p.sc})`;
     p.el.style.opacity = u < .6 ? 1 : 1 - (u - .6) / .4;
   }
-  const m = $('#mindtimer'); m.style.display = B.mind || B.raid ? 'block' : 'none'; if (B.mind) m.textContent = '정신세계 ' + Math.ceil(B.mind.t) + 's'; else if (B.raid) { m.style.color = '#ffd873'; m.textContent = '레이드 ' + Math.max(0, Math.ceil(B.raid.t)) + 's · 누적 피해 ' + Math.round(B.raid.dmg).toLocaleString(); }
+  const m = $('#mindtimer'); m.style.display = B.mind || B.raid || B.series ? 'block' : 'none'; if (B.mind) m.textContent = '정신세계 ' + Math.ceil(B.mind.t) + 's'; else if (B.series) { m.style.color = '#ffd873'; m.textContent = `ROUND ${B.series.round}  ·  ${B.series.w[0]} : ${B.series.w[1]}  (먼저 3승)`; } else if (B.raid) { m.style.color = '#ffd873'; m.textContent = '레이드 ' + Math.max(0, Math.ceil(B.raid.t)) + 's · 누적 피해 ' + Math.round(B.raid.dmg).toLocaleString(); }
 }
 
 export function pop(pos, text, color, big) {
