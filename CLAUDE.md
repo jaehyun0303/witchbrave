@@ -82,3 +82,9 @@
 - 이터널슈가 너프: 시작 보호막 40,000→30,000 / 수면 피해감소 60→45%·회복 20→12%·쿨 25→30 / 설탕낙원 피해감소 80→55%·회복 체력35→20%·보호막40→25%·유지 60→40초·쿨 50→65.
 - 어둠마녀 패시브(`hurt` 안 `dk`): 적중마다(지속 피해 제외) 상대 보호막의 20%를 흡수해 내 보호막으로(`shieldMax` 자동 확장), 내가 주는 피해의 10%는 보호막을 관통해 체력에 직접 들어감.
 - 사일런트솔트 모델: `www/assets/models/silent/silent.fbx` + `silent_base.jpg` (Tripo FBX, 리깅 없음, 높이 2.5). Tripo FBX 로더는 `src/pvglb.js` 의 `FBX` 표(`pv`, `silent`)에 한 줄 추가하면 되고, `models.js` 에서 `fbxReady/applyFbx` 로 적용한다. 쉐도우밀크·퓨바 **각성 모델**은 별도 파일을 받으면 같은 방식으로 추가.
+
+## 5단계: 사일런트솔트 / 리치 궁극기 (각성 후 R키, 게이지 9000)
+- 사일런트솔트: HP 10000 이하 → `form='hour'`(침묵의 때: 데미지·범위 +30%, `skills.hour` 테이블). 궁극기 '신의 은포크 심판' = `startForkUlt/updForks/startSeal/updSeal/endSeal` (봉인수 내부: 망령 6 → 봉인수 처치 시 해제, 해제 후 `sealSoul`: 체력 -70%·데미지 -50%·쿨 +50%·패시브 소멸).
+- 리치: 궁극기 '드래곤의 심연' = `startLichUlt/updLult/startAbyss/updAbyss/endAbyss` (잡히면 30초 스턴, 탈출하면 `permRev/permSlow/mindOpen`).
+- 두 궁극기 모두 듀얼/AI 대전에서만(레이드·탐험 제외). 유리 깨짐은 `ui.glass()/glassFall()` DOM 오버레이.
+- 각성(SAVE.awake) 해금 UI는 아직 없음 → 테스트는 `WB.SAVE.awake=['silent','lich']`.

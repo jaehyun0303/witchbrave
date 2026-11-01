@@ -78,6 +78,21 @@ export function createWorld(canvas) {
   mfloor.position.y = -.6; mfloor.receiveShadow = true; mind.add(mfloor);
   const mrune = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0xff6ad8, transparent: true, opacity: .6, blending: THREE.AdditiveBlending, depthWrite: false }));
   mrune.rotation.x = -Math.PI / 2; mrune.position.y = .03; mind.add(mrune);
+  /* ----- 봉인수 내부 (사일런트솔트 궁극기): 본 맵 옆에 떨어져 있는 별도 섬 ----- */
+  const sealRealm = new THREE.Group(); sealRealm.position.set(500, 0, 0); sealRealm.visible = false; scene.add(sealRealm);
+  const sfloor = new THREE.Mesh(new THREE.CylinderGeometry(30, 32, 1.4, 64), new THREE.MeshStandardMaterial({ color: 0x0f2a28, roughness: .65, metalness: .2, emissive: 0x06201c })); sfloor.position.y = -.7; sfloor.receiveShadow = true; sealRealm.add(sfloor);
+  const srune = new THREE.Mesh(new THREE.PlaneGeometry(56, 56), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0x4cd89a, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false })); srune.rotation.x = -Math.PI / 2; srune.position.y = .03; sealRealm.add(srune);
+  const sring = new THREE.Mesh(new THREE.TorusGeometry(31, .5, 8, 64), new THREE.MeshBasicMaterial({ color: 0x7dffd0 })); sring.rotation.x = Math.PI / 2; sring.position.y = .3; sealRealm.add(sring);
+  for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, h = 6 + Math.random() * 8, p = new THREE.Mesh(new THREE.ConeGeometry(1.1, h, 5), new THREE.MeshStandardMaterial({ color: 0x1d4a44, emissive: 0x2fbf95, emissiveIntensity: .45, flatShading: true })); p.position.set(Math.cos(a) * 33, h / 2 - .4, Math.sin(a) * 33); p.rotation.z = (Math.random() - .5) * .3; sealRealm.add(p); }
+  const sglow = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.MeshBasicMaterial({ map: tex('glow'), color: 0x2fbf95, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false })); sglow.rotation.x = -Math.PI / 2; sglow.position.y = .02; sealRealm.add(sglow);
+  const slight = new THREE.PointLight(0x7dffd0, 1.6, 70); slight.position.set(0, 8, 0); sealRealm.add(slight);
+  /* ----- 드래곤의 심연 ----- */
+  const abyss = new THREE.Group(); abyss.visible = false; scene.add(abyss);
+  abyss.add(skyDome(0x120004, 0x4a0610, 0x0a0002, 0xff3a3a));
+  const afloor = new THREE.Mesh(new THREE.CylinderGeometry(82, 86, 1.2, 72), new THREE.MeshStandardMaterial({ color: 0x2a0a0e, roughness: .6, metalness: .3, emissive: 0x1a0408 }));
+  afloor.position.y = -.6; afloor.receiveShadow = true; abyss.add(afloor);
+  const arune = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0xff2a3a, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false }));
+  arune.rotation.x = -Math.PI / 2; arune.position.y = .03; abyss.add(arune);
   const hearts = [];
   for (let i = 0; i < 18; i++) {
     const h = heartMesh(new THREE.MeshStandardMaterial({ color: 0xff5fc8, emissive: 0xff2aa8, emissiveIntensity: .9, roughness: .3 }), 1 + Math.random() * 2.5);
@@ -123,10 +138,13 @@ export function createWorld(canvas) {
     // 그림자 카메라가 보고 있는 지점을 따라가게 한다
     focus(v) { moonL.target.position.copy(v); moonL.position.set(v.x - 14, 30, v.z + 12); },
     setMind(on) {
-      this.inMind = on; arena.visible = !on; mind.visible = on;
+      this.inMind = on; arena.visible = !on; mind.visible = on; abyss.visible = false; if (!on) sealRealm.visible = false;
       scene.fog.color.set(on ? 0x3a0a40 : theme.fog[0]);
       bloom.strength = on ? .9 : theme.bloom;
     },
+    setAbyss(on) { this.setMind(false); arena.visible = !on; abyss.visible = on; scene.fog.color.set(on ? 0x1a0206 : theme.fog[0]); bloom.strength = on ? .9 : theme.bloom; },
+    setSealRealm(on) { sealRealm.visible = on; },
+    setSeal(on) { this.setMind(on); if (on) scene.fog.color.set(0x06161a); },
     setStorm(on) {
       scene.fog.color.set(on ? 0x3a0510 : theme.fog[0]); scene.fog.density = on ? .012 : theme.fog[1]; hemi.color.set(on ? 0xff5060 : theme.hemi[0]); moonL.color.set(on ? 0xff7080 : theme.moon);
     },

@@ -72,7 +72,7 @@ export function update(B, camera, renderer, dt) {
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
     p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
-    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : '';
+    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'hour' ? ' [침묵의 때]' : f.sealSoul ? ' [영혼]' : '';
     p.slots.forEach(s => {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
@@ -119,3 +119,28 @@ export function title(text, sub) {
 export function vignette(on) { $('#game').classList.toggle('vig', on); }
 export function result(text, sub) { $('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
 export function hideHud() { hud = null; $('#mindtimer').style.display = 'none'; }
+
+/* 유리 깨짐 연출 (리치드래곤 궁극기) */
+export function glass(on) {
+  const old = document.getElementById('glass'); if (old) old.remove();
+  if (!on) return;
+  const g = document.createElement('div'); g.id = 'glass'; g.style.cssText = 'position:absolute;inset:0;z-index:60;pointer-events:none;overflow:hidden';
+  $('#game').appendChild(g);
+  const C = 9, R = 6, P = [], jit = () => (Math.random() - .5) * 7;
+  for (let r = 0; r <= R; r++) { P[r] = []; for (let c = 0; c <= C; c++) P[r][c] = [c / C * 100 + (c === 0 || c === C ? 0 : jit()), r / R * 100 + (r === 0 || r === R ? 0 : jit())]; }
+  let svg = '';
+  const tri = (a, b, c) => {
+    const d = document.createElement('div'), cx = (a[0] + b[0] + c[0]) / 3, cy = (a[1] + b[1] + c[1]) / 3;
+    d.className = 'shard'; d.dataset.cx = cx; d.dataset.cy = cy;
+    d.style.cssText = 'position:absolute;inset:0;clip-path:polygon(' + [a, b, c].map(p => p[0] + '% ' + p[1] + '%').join(',') + ');background:linear-gradient(' + Math.round(Math.random() * 360) + 'deg,rgba(255,255,255,.22),rgba(255,90,140,.14));transform-origin:' + cx + '% ' + cy + '%;transition:transform 1.1s cubic-bezier(.5,0,1,.7),opacity 1.1s ease-in';
+    g.appendChild(d); svg += '<polygon points="' + [a, b, c].map(p => p[0] + ',' + p[1]).join(' ') + '"/>';
+  };
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { const a = P[r][c], b = P[r][c + 1], d = P[r + 1][c], e = P[r + 1][c + 1]; if ((r + c) % 2) { tri(a, b, d); tri(b, e, d); } else { tri(a, b, e); tri(a, e, d); } }
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 100 100'); s.setAttribute('preserveAspectRatio', 'none'); s.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;transition:opacity .5s';
+  s.innerHTML = '<g fill="none" stroke="rgba(255,255,255,.75)" stroke-width=".18" vector-effect="non-scaling-stroke">' + svg + '</g>'; s.id = 'glasslines'; g.appendChild(s);
+}
+export function glassFall() {
+  const g = document.getElementById('glass'); if (!g) return;
+  const l = g.querySelector('#glasslines'); if (l) l.style.opacity = 0;
+  g.querySelectorAll('.shard').forEach(d => { const dx = (Math.random() - .5) * 40, dy = 70 + Math.random() * 60, rot = (Math.random() - .5) * 120; requestAnimationFrame(() => { d.style.transform = 'translate(' + dx + 'vw,' + dy + 'vh) rotate(' + rot + 'deg)'; d.style.opacity = 0; }); });
+}
