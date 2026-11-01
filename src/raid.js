@@ -1,7 +1,7 @@
 // 레이드 「거짓의 탑」: 컷씬 → 보스전(깰 수 없음) → 요거트강(거짓으로 답하기) → 체스 → 타로 카드 짝맞추기 → 거짓의 동굴(던전) → 쉐도우밀크 보스전 → 결말.
 // 원래는 2명 이상의 파티가 필요하다. 서버가 아직 없어서 지금은 "AI 동료"와 함께 진행한다(역할이 나뉘는 미니게임에서 동료가 나머지 역할을 맡음).
 import { Chess } from 'chess.js';
-import { ART_A } from './loadart.js';
+import { portraitImg } from './portrait.js';
 
 const FONT = "font-family:'Jua','Noto Sans KR',sans-serif";
 const HAN = "font-family:'Black Han Sans','Jua',sans-serif";
@@ -35,7 +35,7 @@ const BG = {
   cave: 'linear-gradient(#10152a,#2a1f3a 60%,#0a0818)',
   end: 'radial-gradient(circle at 50% 40%,#8a3aa8 0,#2a0a4a 60%,#05010f 100%)',
 };
-const portrait = (x, y, w, h, flip) => ART_A.replace(/style="[^"]*"/, `style="position:absolute;left:${x}px;top:${y}px;overflow:visible;${flip ? 'transform:scaleX(-1);' : ''}"`).replace(/width="\d+"/, `width="${w}"`).replace(/height="\d+"/, `height="${h}"`);
+const portrait = (x, y, w, h, flip) => portraitImg('shadow', flip ? -.4 : .4, `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;object-fit:contain;filter:drop-shadow(0 12px 18px #0008)`);
 const TOWER = `<svg viewBox="0 0 200 400" width="260" height="520" style="position:absolute;left:510px;top:60px"><defs><linearGradient id="tw" x1="0" x2="1"><stop offset="0" stop-color="#2a1a6a"/><stop offset=".5" stop-color="#4a3aa8"/><stop offset="1" stop-color="#1a0f4a"/></linearGradient></defs>
 <path d="M70 400 L78 120 L100 20 L122 120 L130 400Z" fill="url(#tw)" stroke="#0a0624" stroke-width="4"/><path d="M60 250 h80 M64 200 h72 M70 150 h60 M72 300 h56 M66 350 h68" stroke="#7a6af0" stroke-width="3" opacity=".5"/>
 <ellipse cx="100" cy="46" rx="10" ry="16" fill="#9ee0ff"/><rect x="90" y="330" width="20" height="70" rx="10" fill="#ffe08a"/><g fill="#9ee0ff"><circle cx="100" cy="190" r="7"/><circle cx="100" cy="240" r="7"/></g></svg>`;
@@ -213,32 +213,35 @@ function cards() {
   });
 }
 
-/* ---------- 4. 거짓의 동굴 (던전) ---------- */
-const DOORS = [
-  { id: 'fight', n: '⚔️ 거짓 쿠키의 방', d: '평범한 전투' }, { id: 'chest', n: '🎁 보물이 있는 방', d: '다음 전투에서 보호막 +8,000' }, { id: 'trap', n: '☠️ 함정이 있는 방', d: '다음 전투를 체력 70%로 시작' },
-];
+/* ---------- 요거트강 (실제 맵) ---------- */
+function gateCard(q, idx) {
+  return new Promise(res => {
+    const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;bottom:3%;transform:translateX(-50%);width:min(840px,95vw);box-sizing:border-box;padding:14px 22px;border:5px solid #2b1830;border-radius:26px;background:#fff3df;color:#2b1830;text-align:center;z-index:99990;font-family:Jua,sans-serif';
+    d.innerHTML = `<div style="font-size:15px;color:#6b4a63">요거트강 ${idx + 1} / 10 · <b style="color:#d6405f">틀린 답(거짓)</b>을 골라야 떠요!</div><div style="font-size:clamp(18px,3.4vw,28px);margin:6px 0 10px">${q.q}</div><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">${q.o.map((o, k) => `<button data-k="${k}" style="min-width:150px;height:54px;padding:0 14px;${BTN('#fff')};font-size:clamp(17px,3vw,26px)">${o}</button>`).join('')}</div><div style="margin:10px auto 0;width:70%;height:12px;border:3px solid #2b1830;border-radius:8px;background:#eee;overflow:hidden"><div id="gtm" style="height:100%;width:100%;background:#ff7a8a;transition:width 15s linear"></div></div>`;
+    document.body.appendChild(d); requestAnimationFrame(() => requestAnimationFrame(() => { const t = d.querySelector('#gtm'); if (t) t.style.width = '0'; }));
+    let done = false; const end = ok => { if (done) return; done = true; clearTimeout(tk); d.remove(); res(ok); };
+    const tk = setTimeout(() => end(false), 15000);
+    d.querySelectorAll('button[data-k]').forEach(b => b.onclick = () => { if (done) return; const wrong = q.o[+b.dataset.k] !== q.c; b.style.background = wrong ? '#bde8cf' : '#ffb0b8'; setTimeout(() => end(wrong), 450); });
+  });
+}
+async function yogurtMap(api) {
+  const qs = makeQuestions(); hideOv(true);
+  const r = await api.fight(null, { map: 'plain', timeout: 300, explore: { title: '부활의 요거트강 — 헤엄쳐서 건너세요 (질문에는 거짓으로!)', start: [.08, .55], goalX: .92, river: { x0: .3, x1: .7 }, bridgeY: .12, partner: { id: 'lich', x: .08, y: .12 }, gates: Array.from({ length: 10 }, (_, i) => .32 + i * .04), onGate: i => gateCard(qs[i], i) } });
+  hideOv(false); return r.win;
+}
+
+/* ---------- 거짓의 동굴 (실제 맵 던전) ---------- */
 async function dungeon(api) {
-  const foes = pickN(['silent', 'lich', 'sugar', 'dark'], 3);
-  for (let room = 1; room <= 3; room++) {
-    const doors = pickN(DOORS, 2);
-    const door = await new Promise(res => {
-      stage.innerHTML = CSS + `<div style="position:absolute;inset:0;background:${BG.cave}"></div>
-        <div style="position:absolute;left:0;top:40px;width:1280px;text-align:center;${HAN};font-size:50px;-webkit-text-stroke:8px #0a0818;paint-order:stroke fill">거짓의 동굴 · ${room} / 3 번째 방</div>
-        <div style="position:absolute;left:0;top:110px;width:1280px;text-align:center;font-size:23px;color:#bcd0ff">갈림길이에요. 어느 문으로 들어갈까요? (문 뒤에서 거짓 쿠키가 기다려요)</div>
-        <div style="position:absolute;left:0;top:200px;width:1280px;display:flex;justify-content:center;gap:80px">${doors.map((d, i) => `<button data-d="${i}" style="width:330px;height:380px;${BTN('#2a2540')};border-color:#8a7ac8;color:#fff;padding:20px"><div style="font-size:90px">🚪</div><div style="font-size:30px;margin-top:10px">${d.n}</div><div style="font-size:19px;color:#bcd0ff;margin-top:10px">${d.d}</div></button>`).join('')}</div>`;
-      stage.querySelectorAll('button[data-d]').forEach(b => b.onclick = () => res(doors[+b.dataset.d]));
-    });
-    const foe = foes[room - 1], hp = api.CHARS[foe].hp * .5;
-    await banner(`${room}번째 방`, '거짓 쿠키가 나타났다!', 1300);
-    hideOv(true);
-    const r = await api.fight(foe, { hp, pm: 1, area: 1, myHp: door.id === 'trap' ? .7 : 1, myShield: door.id === 'chest' ? 8000 : 0, timeout: 90 });
-    hideOv(false);
-    if (!r.win) return false;
-    await panelScreen('방 클리어!', `${room} / 3`, ['거짓 쿠키를 물리쳤다.', room < 3 ? '다음 방으로 나아간다…' : '동굴 깊은 곳에서 거대한 기운이 느껴진다…'], '다음으로');
-  }
-  await cutscene({ bg: 'cave', lines: ['동굴 끝에서 쉐도우밀크 쿠키가 기다리고 있다.', '뒤에서 따스한 빛이 느껴진다… 퓨어바닐라 쿠키가 우리를 지켜보고 있다!'], who: '거짓의 동굴' });
+  await cutscene({ bg: 'cave', lines: ['거짓의 동굴이다. 어둠 속에서 거짓 쿠키들이 어슬렁거린다.', '직접 걸어 다니며 모두 물리치자. 보물 상자와 함정을 조심해!', '가장 깊은 곳에서는 쉐도우밀크 쿠키가 기다리고 있다…'], who: '거짓의 동굴' });
   hideOv(true);
-  const r = await api.fight('shadow', { hp: 2000000, pm: 2.2, area: 1.3, heal: { every: 7, pct: .14 }, timeout: 150 });
+  const spots = [[.24, .3], [.3, .72], [.42, .5], [.5, .22], [.56, .78], [.66, .42], [.72, .7], [.8, .3]], ids = pickN(['lich', 'silent', 'sugar', 'dark', 'shadow', 'silent', 'dark', 'sugar'], 8);
+  if (!ids.includes('lich')) ids[0] = 'lich';
+  const mobs = spots.map((p, i) => ({ id: ids[i], x: p[0], y: p[1], hp: .5, pm: .8, aggro: 480 }));
+  const r = await api.fight(null, { map: 'ruins', timeout: 480, explore: {
+    title: '거짓의 동굴 — 거짓 쿠키를 모두 물리치세요', start: [.07, .5], goalX: 2, mobs,
+    chests: [{ x: .36, y: .5 }, { x: .62, y: .6 }], traps: [{ x: .46, y: .3 }, { x: .6, y: .5 }, { x: .76, y: .55 }],
+    boss: { id: 'shadow', x: .9, y: .5, hpAbs: 2000000, pm: 2.2, area: 1.3, big: 4, aggro: 99999, heal: { every: 7, pct: .14 } },
+  } });
   hideOv(false); return r.win;
 }
 
@@ -253,12 +256,12 @@ export async function runRaid(c) {
     await cutscene({ intro: true, bg: 'inside', lines: ['사람들은 잘난 입으로 알량한 그 진리만을 찾지.', '하지만? 속으로는 모두가 거짓을 원하고 있어!', '모두들 내 거짓의 탑으로 온 것을 환영한다!!'] });
     await banner('거짓의 군주', '1번째 관문', 1500);
     hideOv(true);
-    await api.fight('shadow', { hp: 20000000000000000, pm: 12, area: 2, timeout: 70 });   // 깰 수 없는 보스전: 쓰러지거나 시간이 다 되면 다음으로
+    await api.fight('shadow', { hp: 20000000000000000, pm: 12, area: 2, timeout: 70, big: 5 });   // 깰 수 없는 보스전: 쓰러지거나 시간이 다 되면 다음으로
     hideOv(false);
     await cutscene({ bg: 'inside', lines: ['하하하하하하! 봐봐봐, 그 입으로 떠들기만 하는 그 진리…', '넌 그 진리에 대해 이해하기는 하나????', '너도 이제 거짓의 쿠키야!'] });
     await banner('부활의 요거트강', '2번째 관문', 1500);
     await panelScreen('부활의 요거트강', '역할 분담', ['한 명은 <b>다리</b>를 건너고, 한 명은 <b>요거트강</b>을 헤엄쳐야 해요.', '요거트강에서는 <b>거짓의 쿠키</b>만 뜰 수 있어요. 진리를 외치면 <b>가라앉아 죽어요!</b>', '10개의 질문이 나와요. 반드시 <b>틀린 답(거짓)</b>을 골라요.', '나: 요거트강 · AI 동료: 다리', '한 명이라도 죽으면 레이드 실패!'], '시작', BG.river);
-    if (!await yogurt()) return await fail('요거트강에 가라앉았다…', ['진리를 외친 쿠키는 요거트강에 가라앉고 말았다.', '레이드는 실패했습니다.']);
+    if (!await yogurtMap(api)) return await fail('요거트강에 가라앉았다…', ['진리를 외친 쿠키는 요거트강에 가라앉고 말았다.', '레이드는 실패했습니다.']);
     await cutscene({ bg: 'river', lines: ['하하하하핳! 너도 거짓의 쿠키가 다 되었도다!'] });
     await banner('거짓의 체스', '3번째 관문', 1500);
     await panelScreen('거짓의 체스', '조종자 + 체스말', ['한 명은 <b>체스말</b>이 되고, 한 명은 그 말을 움직이는 <b>조종자</b>예요.', '나: 조종자(흰 말) · AI 동료: 체스말', '쉐도우밀크 쿠키에게 지면 <b>체스말이 된 쿠키만</b> 쓰러지고, 레이드는 계속돼요.'], '시작', BG.tarot);
@@ -284,4 +287,4 @@ export async function runRaid(c) {
 }
 
 // 디버그용(?): window.__GF_DEBUG 가 켜져 있으면 미니게임을 따로 실행해 볼 수 있다
-if (typeof window !== 'undefined') window.__rd = { mount, unmount, yogurt, chess, cards, dungeon, FACTS, makeQuestions, cutscene, hideOv };
+if (typeof window !== 'undefined') window.__rd = { mount, unmount, yogurt, yogurtMap, chess, cards, dungeon, FACTS, makeQuestions, cutscene, hideOv };

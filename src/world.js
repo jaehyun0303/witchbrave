@@ -127,6 +127,9 @@ export function createWorld(canvas) {
       scene.fog.color.set(on ? 0x3a0a40 : theme.fog[0]);
       bloom.strength = on ? .9 : theme.bloom;
     },
+    setStorm(on) {
+      scene.fog.color.set(on ? 0x3a0510 : theme.fog[0]); scene.fog.density = on ? .012 : theme.fog[1]; hemi.color.set(on ? 0xff5060 : theme.hemi[0]); moonL.color.set(on ? 0xff7080 : theme.moon);
+    },
     setParadise(on) {
       floor.material.color.set(on ? 0xffc9e8 : theme.floor); scene.fog.color.set(on ? 0xf4b8dc : theme.fog[0]); scene.fog.density = on ? .005 : theme.fog[1];
       hemi.color.set(on ? 0xffd6f0 : theme.hemi[0]);
@@ -152,7 +155,7 @@ export function createWorld(canvas) {
       rocks.forEach(r => { r.position.y = r.userData.b + Math.sin(time * .5 + r.userData.p) * .6; r.rotation.y += dt * .05; });
       hearts.forEach(h => { h.position.y = h.userData.y + Math.sin(time * .8 + h.userData.p) * 1.2; h.rotation.y += dt * .6; });
       crystals.forEach((c, i) => {
-        const u = c.userData; u.crystal.rotation.y += dt * .8; u.crystal.position.y = 1.7 + Math.sin(time * 1.5 + i) * .12;
+        const u = c.userData; if (!u.mat) return; u.crystal.rotation.y += dt * .8; u.crystal.position.y = 1.7 + Math.sin(time * 1.5 + i) * .12;
         u.mat.emissive.set(charmed ? 0xff3fc8 : 0x5a46ff); u.mat.color.set(charmed ? 0xff9ae6 : 0x7a6aff);
         u.ring.material.color.set(charmed ? 0xff6ad8 : 0x8f7bff); u.ring.rotation.z += dt;
       });

@@ -34,6 +34,19 @@ export const RAID_BOSS_HP = 2000000, RAID_TIME = 60;
 let ctx;
 export function initHub(c) { ctx = c; }
 const SV = () => ctx.S();
+export const nickOf = () => SV().nick || '플레이어';
+export function askNick(done, parent) {
+  const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50';
+  o.innerHTML = '<div style="width:460px;padding:26px;border:4px solid #2b1830;border-radius:22px;background:#fff3df;text-align:center;font-family:Jua,sans-serif;color:#2b1830"><div style="font-size:30px;margin-bottom:6px">닉네임 설정</div><div style="font-size:16px;color:#6b4a63;margin-bottom:14px">2~10글자 (한글·영문·숫자)</div><input id="nin" maxlength="10" style="width:300px;height:46px;border:3px solid #2b1830;border-radius:14px;padding:0 14px;font-size:22px;font-family:inherit;text-align:center"><div id="nerr" style="height:22px;font-size:15px;color:#c0392b;margin-top:6px"></div><div style="display:flex;gap:12px;justify-content:center;margin-top:6px"><button id="nok" style="width:130px;height:46px;border:3px solid #2b1830;border-radius:16px;background:#3ddbb0;font-size:22px;font-family:inherit;cursor:pointer;box-shadow:0 4px 0 #2b1830">확인</button><button id="nno" style="width:130px;height:46px;border:3px solid #2b1830;border-radius:16px;background:#ffe4bd;font-size:22px;font-family:inherit;cursor:pointer;box-shadow:0 4px 0 #2b1830">취소</button></div></div>';
+  (parent || root || document.body).appendChild(o);
+  const inp = o.querySelector('#nin'); inp.value = SV().nick || ''; inp.focus();
+  o.querySelector('#nno').onclick = () => o.remove();
+  o.querySelector('#nok').onclick = () => {
+    const v = inp.value.trim();
+    if (v.length < 2 || v.length > 10 || !/^[가-힣A-Za-z0-9_ ]+$/.test(v)) { o.querySelector('#nerr').textContent = '2~10글자, 한글·영문·숫자만 쓸 수 있어요'; return; }
+    SV().nick = v; ctx.api.persist(); o.remove(); ctx.toast('닉네임: ' + v); if (done) done();
+  };
+}
 export function H() {
   const S = SV(), h = S.hub = S.hub || {};
   h.shards ??= 0; h.pity ??= 0; h.pv ??= 0;
@@ -155,7 +168,7 @@ function evPick() {
     <div style="height:150px;background:repeating-linear-gradient(45deg,${col[0]} 0,${col[0]} 16px,${col[1]} 16px,${col[1]} 32px);display:flex;align-items:center;justify-content:center;font-size:84px">${tag}</div>
     <div style="padding:10px 14px;${FONT};color:#2b1830"><div style="font-size:26px">${name}</div><div style="font-size:16px;opacity:.75;margin-top:2px">${sub}</div><div style="font-size:15px;margin-top:8px;color:#6b4a63">${note}</div></div>
     <div style="position:absolute;left:10px;top:10px;padding:2px 12px;border:3px solid #2b1830;border-radius:12px;background:#ffb02e;${FONT};font-size:16px">PICK UP</div></div>`;
-  return `<div style="position:absolute;left:24px;top:22px;display:flex;gap:18px">${card('쉐도우밀크 쿠키', '비스트 · 암살자', ['#ff5a4d', '#ff9a8c'], have ? '보유 중 (중복 시 코인 3,000 + 조각 30)' : '아직 없어요! 유체이탈 · 쉐도우 스텝', '🌑')}${card('퓨어바닐라 쿠키', '고등급 · 출시 예정', ['#ffd873', '#fff3c0'], `획득 시 보관돼요 (보관 ${h.pv}개)`, '☀️')}</div>
+  return `<div style="position:absolute;left:24px;top:22px;display:flex;gap:18px">${card('쉐도우밀크 쿠키', '비스트 · 암살자', ['#ff5a4d', '#ff9a8c'], have ? '보유 중 (중복 시 코인 3,000 + 조각 30)' : '아직 없어요! 유체이탈 · 쉐도우 스텝', '🌑')}${card('퓨어바닐라 쿠키', '에인션트 · 서포터', ['#ffd873', '#fff3c0'], S.unlocked.includes('pv') ? '보유 중 (중복 시 코인 3,000 + 조각 30)' : '아직 없어요! 보호의 장막 · 다크문', '☀️')}</div>
     <div style="position:absolute;left:24px;top:330px;width:670px;${FONT};font-size:17px;line-height:25px;color:#2b1830">확정: ${PITY}회 안에 반드시 픽업 쿠키가 나와요. (현재 ${h.pity} / ${PITY})<div style="margin-top:6px">${bar(h.pity / PITY, 420, '#ff7a8a')}</div>
       <div style="margin-top:8px;font-size:15px;color:#6b4a63">${SHARD}은 이벤트 퀘스트와 쉐도우밀크 레이드로 모아요.</div></div>
     <div style="position:absolute;left:724px;top:22px;width:448px;height:230px;box-sizing:border-box;border:3px solid #2b1830;border-radius:18px;background:#fff;padding:12px 16px;${FONT};font-size:16px;line-height:24px;color:#2b1830"><b style="font-weight:400;font-size:19px">획득 확률</b><br>픽업 쿠키(쉐도우밀크 · 퓨어바닐라) 2% (각 1%)<br>코인 1,000 · 에픽 8% / 코인 500 · 레어 20%<br>뽑기권 1장 10% / 패스 XP 50 20% / 코인 200 · 커먼 40%<br><span style="font-size:14px;color:#6b4a63">10회 뽑기는 레어 이상 1개 이상이 보장돼요.</span></div>
@@ -174,7 +187,8 @@ function pull(n) {
       if (Math.random() < .5) {
         if (S.unlocked.includes('shadow')) { S.coins += 3000; h.shards += 30; out.push({ k: 'c', s: '코인 3,000', sub: '쉐도우밀크 중복 · 조각 +30', g: 7 }); }
         else { S.unlocked.push('shadow'); out.push({ k: 'n', s: '쉐도우밀크 쿠키', sub: '비스트 · 신규', g: 7 }); }
-      } else { h.pv++; out.push({ k: 'n', s: '퓨어바닐라 쿠키', sub: '고등급 · 출시 예정(보관됨)', g: 7 }); }
+      } else if (S.unlocked.includes('pv')) { S.coins += 3000; h.shards += 30; out.push({ k: 'c', s: '코인 3,000', sub: '퓨어바닐라 중복 · 조각 +30', g: 7 }); }
+      else { S.unlocked.push('pv'); out.push({ k: 'n', s: '퓨어바닐라 쿠키', sub: '에인션트 · 신규', g: 7 }); }
     } else if (r < 10) { S.coins += 1000; out.push({ k: 'c', s: '1,000', sub: '코인', g: 3 }); }
     else if (r < 30) { S.coins += 500; out.push({ k: 'c', s: '500', sub: '코인', g: 2 }); }
     else if (r < 40) { S.tickets++; out.push({ k: 'c', s: '뽑기권 x1', sub: '', g: 2 }); }
@@ -259,8 +273,8 @@ export function openProfile(t) {
         <div style="font-size:110px;margin-top:28px">${rk.e}</div><div style="${HAN};font-size:46px;${stroke(8)}">${rk.n}</div><div style="font-size:24px;margin-top:6px">🏆 ${fmt(tt)}</div>
         <div style="margin:18px 40px 0">${bar(nx ? (tt - rk.at) / (nx.at - rk.at) : 1, 340, rk.c)}</div><div style="font-size:16px;margin-top:8px">${nx ? `다음 랭크 ${nx.n}까지 🏆 ${nx.at - tt}` : '최고 랭크예요!'}</div>
         <div style="margin-top:16px;font-size:15px;color:#6b4a63;padding:0 26px">랭크는 모든 쿠키의 트로피 합계로 정해져요.<br>승리 +8 · 패배 -4</div></div>
-      <div style="position:absolute;left:470px;top:22px;width:700px"><div style="${HAN};font-size:28px;${stroke(6)};margin-bottom:6px">전적</div>
-        ${st('총 승리', fmt(wins))}${st('플레이한 경기', fmt(plays))}${st('승률', plays ? Math.round(wins / plays * 100) + '%' : '-')}${st('보유 쿠키', `${S.unlocked.length} / 5`)}${st('가장 높은 쿠키', best ? `${ctx.api.CHARS[best[0]].name} 🏆 ${best[1]}` : '-')}${st('레이드 최고 피해', fmt(h.raid.best))}${st('출석 일수', h.att.n + '일')}${st('시즌 패스', 'Lv ' + passLevel())}</div>`;
+      <div style="position:absolute;left:470px;top:22px;width:700px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div style="${HAN};font-size:34px;${stroke(6)}">${nickOf()}</div><button id="nickb" style="width:110px;height:40px;${BTN('#ffc233')};font-size:18px">이름 변경</button></div><div style="${HAN};font-size:28px;${stroke(6)};margin-bottom:6px">전적</div>
+        ${st('총 승리', fmt(wins))}${st('플레이한 경기', fmt(plays))}${st('승률', plays ? Math.round(wins / plays * 100) + '%' : '-')}${st('보유 쿠키', `${S.unlocked.length} / 6`)}${st('가장 높은 쿠키', best ? `${ctx.api.CHARS[best[0]].name} 🏆 ${best[1]}` : '-')}${st('레이드 최고 피해', fmt(h.raid.best))}${st('출석 일수', h.att.n + '일')}${st('시즌 패스', 'Lv ' + passLevel())}</div>`;
   } else if (ptab === 'road') {
     const node = x => {
       const ok = tt >= x.n, got = h.tc[x.n], isRank = RANKS.find(k => k.at === x.n);
@@ -289,6 +303,7 @@ export function openProfile(t) {
   }
   mount('profile', head('프로필', `${rk.e} ${rk.n} · 🏆 ${fmt(tt)}`, 'linear-gradient(#3a2048,#7a4a98)', false) + tb + panel(40, 160, 1200, 530, body), '#3a2048');
   onAll('button[data-p]', d => { ptab = d.p; openProfile(); });
+  on('nickb', () => askNick(() => openProfile()));
   const rewardRoad = n => { const x = TROPHY_ROAD.find(y => y.n === +n); h.tc[x.n] = 1; grant(x.r); return x.r; };
   onAll('button[data-tr]', d => { const x = TROPHY_ROAD.find(y => y.n === +d.tr); if (h.tc[x.n] || tt < x.n) return; ctx.toast('받았어요! ' + rtxt(rewardRoad(x.n))); ctx.api.persist(); const sc = root.querySelector('div[style*="overflow-x:auto"]'); const l = sc ? sc.scrollLeft : 0; openProfile(); const s2 = root.querySelector('div[style*="overflow-x:auto"]'); if (s2) s2.scrollLeft = l; });
   on('trall', () => { let n = 0; for (const x of TROPHY_ROAD) if (tt >= x.n && !h.tc[x.n]) { rewardRoad(x.n); n++; } if (!n) return ctx.toast('받을 보상이 없어요'); ctx.api.persist(); ctx.toast(`보상 ${n}개를 받았어요`); openProfile(); });

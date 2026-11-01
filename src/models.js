@@ -32,6 +32,7 @@ export function heartMesh(mat, size = 1) {
 export function buildCookie(def) {
   const id = def.id, col = new THREE.Color(def.color);
   const P = {
+    pv: { skin: 0xfff0dc, hair: 0xfff8e0, eye: 0xffc933, cloth: 0xf7e7c4, trim: 0xffd873 },
     silent: { skin: 0xf1ebe0, hair: 0xf6f8ff, eye: 0x9fc0ff, cloth: 0x34447f, trim: 0xcfd8ff },
     lich: { skin: 0xd9a8f0, hair: 0x2a1442, eye: 0xff5fd0, cloth: 0x6a2f9a, trim: 0xe9b5ff },
   }[id] || { skin: col.clone().lerp(new THREE.Color(0xffffff), .35).getHex(), hair: col.clone().multiplyScalar(.5).getHex(), eye: 0xffffff, cloth: col.clone().multiplyScalar(.45).getHex(), trim: def.color };
@@ -96,6 +97,12 @@ export function buildCookie(def) {
     // 임시 캐릭터 액세서리
     head.add(sph(.67, hair, 0, .12, -.06, 1.05, .88, 1.0));
     if (id === 'dark') { const hat = grp(0, .66, 0); hat.add(cone(.42, .9, cloth, 0, .45, 0, 16), cyl(.8, .8, .06, cloth, 0, 0, 0, 24)); hat.rotation.z = .12; head.add(hat); }
+    if (id === 'pv') {
+      const gold = M(0xffd873, { e: 0xffb020, ei: .7, m: .6, r: .3 });
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(.42, .03, 8, 32), new THREE.MeshBasicMaterial({ color: 0xfff3a0 })); halo.position.set(0, .95, -.1); halo.rotation.x = .25; head.add(halo); rig.extras.halo = halo;
+      for (const s of [-1, 1]) { const w = mesh(new THREE.ConeGeometry(.3, 1.1, 3), M(0xffffff, { e: 0xfff3c0, ei: .6, t: true, op: .8, side: THREE.DoubleSide }), s * .5, 1.15, -.4); w.rotation.set(.2, 0, s * 1.0); body.add(w); }
+      body.add(cone(.58, 1.15, cloth, 0, .55, -.2, 20));
+    }
     if (id === 'shadow') { for (const s of [-1, 1]) { const h = cone(.12, .6, M(0xe8e0ff), s * .4, .62, 0, 8); h.rotation.z = -s * .35; head.add(h); } }
     if (id === 'sugar') { const h = new THREE.Mesh(new THREE.TorusGeometry(.4, .04, 8, 32), new THREE.MeshBasicMaterial({ color: 0xffe0f2 })); h.position.y = .95; h.rotation.x = Math.PI / 2; head.add(h); }
     const wp = grp(); wp.add(cyl(.04, .04, 1.4, M(0x333344), 0, -.5, 0), sph(.2, M(def.color, { e: def.color, ei: 1.4 }), 0, -1.25, 0)); wp.rotation.x = -1.0; hand.add(wp); rig.weapon = wp;

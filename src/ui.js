@@ -44,6 +44,7 @@ export function beginBattle(B) {
   const root = $('#hud'); root.innerHTML = ''; pops.forEach(p => p.el.remove()); pops = [];
   hud = { B, panels: [], tags: [] };
   B.fighters.forEach((f, i) => {
+    if (B.explore && i > 0) { addTag(f); return; }
     const keys = f.ctrl.kind === 'h2' ? ['7', '8', '9', '0'] : ['Z', 'X', 'C', 'V'];
     const mine = f.ctrl.kind === 'h1' || (f.ctrl.kind === 'h2' && B.mode === 'local');
     const p = document.createElement('div'); p.className = 'hpanel ' + (i ? 'right' : 'left');
@@ -55,6 +56,12 @@ export function beginBattle(B) {
     hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), sh: p.querySelector('.shfill'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
     hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic') });
   });
+}
+
+export function addTag(f) {
+  if (!hud || hud.tags.some(t => t.f === f)) return;
+  const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="mini"><div></div></div><div class="ic"></div>'; $('#hud').appendChild(tag);
+  hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic') });
 }
 
 export function update(B, camera, renderer, dt) {

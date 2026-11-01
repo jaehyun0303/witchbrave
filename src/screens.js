@@ -3,6 +3,7 @@
 import LOADING from './ui-screens/loading.html';
 import { playGacha } from './gachafx.js';
 import { ART_A, ART_B } from './loadart.js';
+import { portraitImg } from './portrait.js';
 import * as hub from './hub.js';
 import LOBBY from './ui-screens/lobby.html';
 import MODE from './ui-screens/mode-select.html';
@@ -26,6 +27,7 @@ const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   lich: { rar: '드래곤', group: '딜러', role: '마법 딜러', atk: 70, spd: 50, rng: 60 },
   shadow: { rar: '비스트', group: '암살자', role: '암살자', atk: 55, spd: 70, rng: 50 },
   sugar: { rar: '비스트', group: '서포터', role: '서포터', atk: 45, spd: 45, rng: 75 },
+  pv: { rar: '에인션트', group: '서포터', role: '마법 힐러', atk: 40, spd: 50, rng: 65 },
   dark: { rar: '레전더리', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
 };
 // 등급제: 커먼 < 레어 < 에픽 < 슈퍼에픽 < 레전더리 < 에인션트 < 비스트 < 드래곤
@@ -42,7 +44,7 @@ const WEEKLY = [
   { id: 'w3', t: '뽑기 5회 돌리기', k: 'wgachas', n: 5, r: 400 }, { id: 'w4', t: '승리 10번 달성하기', k: 'wwins', n: 10, r: 1000 }, { id: 'w5', t: '경기 25회 플레이하기', k: 'wplays', n: 25, r: 1000 }, { id: 'w6', t: '출석 5일 하기', k: 'watt', n: 5, r: 800 },
 ];
 export const SEASON = { no: 1, name: '찬란한 지식의 봄', part: 1, parts: ['거짓은 심연을 삼키고', '진리는 따스히 세상을 비추리라'], main: ['shadow'] };   // 메인 고등급: 쉐도우밀크 · 퓨어바닐라(미구현) 및 각성
-const EVENT_ONLY = ['shadow'];   // 이벤트 픽업 뽑기에서만 나오는 쿠키 (일반 뽑기 제외)
+const EVENT_ONLY = ['shadow', 'pv'];   // 이벤트 픽업 뽑기에서만 나오는 쿠키 (일반 뽑기 제외)
 const partName = () => SEASON.parts[SEASON.part - 1];
 const TIPS = ['스킬은 적이 모여 있을 때 사용하면 더 효과적이에요.', '맵이 넓어졌어요. 장애물 뒤에서 투사체를 피해 보세요.', '쉐도우밀크의 장막 안에서는 Q로 쉐도우 스텝을 쓸 수 있어요.', '데미지를 많이 넣으면 궁극기 게이지가 차올라요.'];
 
@@ -128,11 +130,17 @@ export function openCustom(name, html, bg = '#3a2048') {
 export function init(a) { api = a; ensureSave(S()); hub.initHub({ S, api: a, toast, openCustom, back: () => open('lobby') }); viewId = api.picked(); open('lobby'); }
 
 /* ---------- 로딩 ---------- */
+let loadArt = null;
+// 로딩 화면의 A/B 자리에 3D 모델 사진을 넣는다 (A=쉐도우밀크 오른쪽을 향함, B=퓨어바닐라 왼쪽을 향함)
+export function setLoadPortrait(which, id) {
+  if (!loadArt) return; const lab = which === 'A' ? '쉐도우밀크 쿠키' : '퓨어바닐라 쿠키', old = loadArt.querySelector(`svg[aria-label="${lab}"]`); if (!old) return;
+  const t = document.createElement('div'); t.innerHTML = which === 'A' ? portraitImg(id, .55, 'position:absolute;left:10px;top:150px;width:340px;height:497px;object-fit:contain;filter:drop-shadow(0 14px 18px #0009)') : portraitImg(id, -.55, 'position:absolute;left:880px;top:20px;width:370px;height:540px;object-fit:contain;filter:drop-shadow(0 14px 18px #0009)'); old.replaceWith(t.firstChild);
+}
 export function bootLoading() {
   ensureHost(); const w = wraps.loading = document.createElement('div'); w.className = 'scr'; host.appendChild(w);
   const art = parse(LOADING); { const n = textNodes(art).find(t => t.data.includes('[업데이트 이름]')); if (n) n.data = 'SEASON ' + SEASON.no + ' · ' + SEASON.name; setText(art, '[버전 번호]', 'v0.1.0 · PART ' + SEASON.part + ' ' + partName()); } setText(art, TIPS[0] ? 'TIP · 스킬은 적이 모여 있을 때 사용하면 더 효과적이에요.' : '', 'TIP · ' + TIPS[Math.floor(Math.random() * TIPS.length)]);
   for (const [lab, svg] of [['캐릭터 A 일러스트 자리', ART_A], ['캐릭터 B 일러스트 자리', ART_B]]) { const ph = art.querySelector(`svg[aria-label="${lab}"]`); if (ph) { const t = document.createElement('div'); t.innerHTML = svg; ph.replaceWith(t.firstChild); } }
-  w.appendChild(art); w.style.display = 'block'; host.style.background = '#2b1a5c'; host.style.display = 'block'; cur = 'loading'; fit(); setProgress(0);
+  w.appendChild(art); loadArt = art; w.style.display = 'block'; host.style.background = '#2b1a5c'; host.style.display = 'block'; cur = 'loading'; fit(); setProgress(0);
 }
 let ld = null;   // 로딩 상태: 막대/퍼센트/문구 노드, 표시값(부드럽게 차오름), 목표값
 function ldFind(w) {
@@ -175,10 +183,11 @@ function wireClose(art) { const c = byLabel(art, '닫기') || byLabel(art, '뒤�
 
 /* ---------- 로비 ---------- */
 const build = {};
+let nickAsked = false;
 build.lobby = art => {
   const SAVE = S(), id = api.picked(), c = api.CHARS[id], mt = meta(id), em = claimable(DAILY).length + claimable(WEEKLY).length;
   byLabel(art, '3D 캐릭터 모델 자리').remove();
-  setText(art, 'PLAYER_01', '플레이어'); setText(art, 'Lv 12', 'Lv ' + (1 + Math.floor(SAVE.totalWins / 3)));
+  setText(art, 'PLAYER_01', hub.nickOf()); setText(art, 'Lv 12', 'Lv ' + (1 + Math.floor(SAVE.totalWins / 3)));
   setText(art, '1,250', fmt(SAVE.gems)); setText(art, '48,300', fmt(SAVE.coins)); setText(art, '12', fmt(SAVE.tickets));
   setText(art, 'CHARACTER 01', c.name); setText(art, '전설', mt.rar); setText(art, 'Lv 9', 'Lv ' + charLv(id)); setText(art, '482', fmt(SAVE.tro[id] || 0));
   const chip = findText(art, mt.rar)?.parentElement; if (chip) chip.style.background = RC[mt.rar][0];
@@ -196,6 +205,7 @@ build.lobby = art => {
   mailB.innerHTML = '<svg aria-hidden="true" width="30" height="30" viewBox="0 0 30 30" style="position:absolute;left:6px;top:6px"><rect x="3" y="6" width="24" height="20" rx="3" fill="#fff" stroke="#2b1830" stroke-width="2.5"/><rect x="3" y="6" width="24" height="6" fill="#ff5c8a" stroke="#2b1830" stroke-width="2.5"/><path d="M9 18l4 4 8-8" fill="none" stroke="#2b1830" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (hub.attendReady() ? '<span style="position:absolute;right:-6px;top:-8px;width:20px;height:20px;border-radius:50%;background:#ff3b5c;border:3px solid #2b1830"></span>' : '');
   mailB.onclick = hub.openAttend; byLabel(art, '시즌 패스').onclick = hub.openPass;
   byLabel(art, '설정').onclick = openSettings;
+  if (!SAVE.nick && !nickAsked) { nickAsked = true; setTimeout(() => hub.askNick(() => open('lobby'), art), 400); }
   byLabel(art, '프로필').onclick = () => hub.openProfile('info');
   for (const l of ['채팅', '친구 초대 1', '친구 초대 2', '보석 충전', '코인 충전', '뽑기권 충전']) byLabel(art, l).onclick = l === '코인 충전' || l === '뽑기권 충전' ? () => open('shop') : soon;
 };
@@ -272,7 +282,7 @@ build.events = art => {
   const P = [...art.children].find(e => e.tagName === 'DIV' && parseInt(e.style.width) > 1000 && parseInt(e.style.width) < 1280) || art;
   const tabs = [...P.querySelectorAll(':scope>button[aria-pressed]')].filter(b => b.style.left === '16px');
   const names = { '이벤트': 'weekly', '일일 미션': 'daily', '주간 미션': 'weekly' };
-  tabs.forEach(b => { const t = b.textContent.replace(/\d+/g, '').trim(), on = names[t] === missionTab && t !== '이벤트'; b.setAttribute('aria-pressed', on); b.style.background = on ? '#3ddbb0' : '#ffe4bd'; b.onclick = () => { if (t === '이벤트') return hub.openEvent('pick'); if (!names[t]) return soon(); missionTab = names[t]; open('events'); }; });
+  tabs.forEach(b => { const t = b.textContent.replace(/\d+/g, '').trim(), on = names[t] === missionTab && t !== '이벤트'; b.setAttribute('aria-pressed', on); b.style.background = on ? '#3ddbb0' : '#ffe4bd'; b.onclick = () => { if (t === '이벤트') return hub.openEvent('pick'); if (t === '출석 체크') return hub.openAttend(); if (t === '시즌 패스') return hub.openPass(); if (!names[t]) return soon(); missionTab = names[t]; open('events'); }; });
   const dayTab = tabs.find(b => b.textContent.includes('일일 미션')), nDaily = claimable(DAILY).length; if (dayTab) { const bd = [...dayTab.querySelectorAll('span')].find(s => /^\d+$/.test(s.textContent.trim())); if (bd) { if (nDaily) bd.textContent = nDaily; else bd.remove(); } }
   const box = [...P.querySelectorAll(':scope>div')].find(e => e.style.top === '92px' && e.style.width === '548px');
   const done = list.filter(d => m.claimed[d.id]).length, pts = done * (100 / list.length);

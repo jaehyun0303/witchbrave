@@ -109,9 +109,12 @@
   .gr.c{border-color:#ffd166;color:#ffd166}.gr.n{border-color:#b6a4ff;color:#e9e0ff;box-shadow:0 0 18px #b6a4ff88}
   @keyframes grpop{0%{transform:scale(.4) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
   #game.lobbymode{background:transparent;pointer-events:none;z-index:60}
+#rotwarn{display:none;position:fixed;inset:0;z-index:99999;background:#1c1030;color:#fff;font-family:Jua,sans-serif;text-align:center;flex-direction:column;align-items:center;justify-content:center}
+@media (orientation:portrait) and (max-width:900px){#rotwarn{display:flex}}
 </style>
 </head>
 <body>
+<div id="rotwarn"><div style="font-size:64px">📱↻</div><div style="font-size:24px;margin-top:10px">가로 화면으로 돌려주세요</div><div style="font-size:15px;opacity:.7;margin-top:6px">화면을 눕히면 게임이 꽉 차게 보여요</div></div>
 <div id="intro"><div class="bg"></div><div class="ip l"></div><div class="ip r"></div><div class="vs">VS</div><div class="cd"></div></div>
 <div id="game" class="bars">
   <canvas id="cv"></canvas>
