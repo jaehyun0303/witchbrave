@@ -1083,6 +1083,24 @@ function updExplore(dt) {
   }
 }
 
+/* ===== 던전 잡몹 (고등급 쿠키보다 훨씬 약함, 도감/뽑기에는 없음) ===== */
+const mobDef = (id, name, color, hp, tag, skills, o = {}) => ({ id, name, color, cost: 0, hp, pref: 5.5, atkRange: o.range || 380, aiPref: o.pref, tag, mob: true, skills: { base: skills } });
+CHARS.mob_dough = mobDef('mob_dough', '거짓 반죽 쿠키', 0xd9a066, 2600, '약한 던전 몹 · 투사체', {
+  a: { name: '반죽 던지기', cd: 1.5, desc: '데미지 60', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 430, r: 11, dmg: 60, color: 0xd9a066, life: 1 }); } },
+  z: { name: '반죽 폭발', cd: 10, desc: '지정 위치 500', use(f, p) { setAnim(f, 'cast', .4); const q = clampRange(f, p, 450); zone(f, { x: q.x, y: q.y, r: 85, delay: .8, dmg: 500, color: 0xd9a066 }); } },
+});
+CHARS.mob_jelly = mobDef('mob_jelly', '거짓 젤리 쿠키', 0xff7aa8, 2000, '약한 던전 몹 · 슬로우', {
+  a: { name: '젤리 탄', cd: 1.4, desc: '데미지 50', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 450, r: 10, dmg: 50, color: 0xff7aa8, life: 1 }); } },
+  x: { name: '끈적 젤리', cd: 9, desc: '데미지 250 + 슬로우', use(f) { setAnim(f, 'cast', .3); shoot(f, { a: f.face, sp: 400, r: 14, dmg: 250, color: 0xff3f7a, life: 1.2, onHit: t => slowOn(t, 2, .5) }); } },
+});
+CHARS.mob_soldier = mobDef('mob_soldier', '거짓 병정 쿠키', 0x9fb0c8, 3400, '약한 던전 몹 · 근접', {
+  a: { name: '창 찌르기', cd: 1.3, desc: '근접 90', use(f) { setAnim(f, 'slash', .25); swing(f, 140, .9, 90, 0xcfd8ff); } },
+  z: { name: '돌진 베기', cd: 8, desc: '근접 광역 400', use(f) { setAnim(f, 'slash', .3); swing(f, 190, 1.6, 400, 0xffffff); } },
+}, { range: 150, pref: 90 });
+CHARS.mob_mage = mobDef('mob_mage', '거짓 마법사 쿠키', 0xb57cff, 2200, '약한 던전 몹 · 마법', {
+  a: { name: '마력탄', cd: 1.6, desc: '유도 70', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 380, r: 11, dmg: 70, color: 0xb57cff, kind: 'orb', life: 1.2, homing: 260, turn: 2.2 }); } },
+  z: { name: '마력 폭발', cd: 11, desc: '지정 위치 700', use(f, p) { setAnim(f, 'cast', .5); const q = clampRange(f, p, 480); zone(f, { x: q.x, y: q.y, r: 100, delay: .9, dmg: 700, color: 0xb57cff }); } },
+}, { pref: 300 });
 const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv'];
 
 /* ===== 리치드래곤 변신 ===== */
@@ -1252,7 +1270,7 @@ function readInput(f) {
   return aiInput(f);
 }
 function aiInput(f) {
-  const e = foe(f), d = dist(f, e), def = f.def, pref = def.id === 'silent' ? 90 : def.id === 'lich' ? 260 : 230, a = ang(f, e), dt = B.dt;
+  const e = foe(f), d = dist(f, e), def = f.def, pref = def.aiPref ?? (def.id === 'silent' ? 90 : def.id === 'lich' ? 260 : 230), a = ang(f, e), dt = B.dt;
   const inp = { mx: 0, my: 0, a: false, keys: [] };
   if (f.aggro && B.explore && d > f.aggro && f.hp >= f.max * .999) return inp;
   f.ai.t -= dt; if (f.ai.t <= 0) { f.ai.t = .6 + Math.random() * .8; f.ai.strafe = Math.random() < .5 ? 1 : -1; }

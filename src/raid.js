@@ -234,9 +234,10 @@ async function yogurtMap(api) {
 async function dungeon(api) {
   await cutscene({ bg: 'cave', lines: ['거짓의 동굴이다. 어둠 속에서 거짓 쿠키들이 어슬렁거린다.', '직접 걸어 다니며 모두 물리치자. 보물 상자와 함정을 조심해!', '가장 깊은 곳에서는 쉐도우밀크 쿠키가 기다리고 있다…'], who: '거짓의 동굴' });
   hideOv(true);
-  const spots = [[.24, .3], [.3, .72], [.42, .5], [.5, .22], [.56, .78], [.66, .42], [.72, .7], [.8, .3]], ids = pickN(['lich', 'silent', 'sugar', 'dark', 'shadow', 'silent', 'dark', 'sugar'], 8);
-  if (!ids.includes('lich')) ids[0] = 'lich';
-  const mobs = spots.map((p, i) => ({ id: ids[i], x: p[0], y: p[1], hp: .5, pm: .8, aggro: 480 }));
+  const spots = [[.2, .28], [.22, .72], [.3, .5], [.36, .25], [.38, .78], [.46, .5], [.5, .2], [.54, .8], [.6, .35], [.64, .66], [.7, .22], [.74, .75], [.8, .45]];
+  const weak = ['mob_dough', 'mob_jelly', 'mob_soldier', 'mob_mage'], ids = spots.map((_, i) => weak[i % 4]).sort(() => Math.random() - .5);
+  ids[Math.floor(spots.length * .55)] = 'lich'; ids[spots.length - 1] = 'dark';   // 고등급 쿠키 몹은 단 2마리 (변신하는 리치드래곤은 중반, 어둠마녀는 보스 앞)
+  const mobs = spots.map((p, i) => ({ id: ids[i], x: p[0], y: p[1], hp: ids[i].startsWith('mob_') ? 1 : .35, pm: ids[i].startsWith('mob_') ? 1 : .7, aggro: 460 }));
   const r = await api.fight(null, { map: 'ruins', timeout: 480, explore: {
     title: '거짓의 동굴 — 거짓 쿠키를 모두 물리치세요', start: [.07, .5], goalX: 2, mobs,
     chests: [{ x: .36, y: .5 }, { x: .62, y: .6 }], traps: [{ x: .46, y: .3 }, { x: .6, y: .5 }, { x: .76, y: .55 }],

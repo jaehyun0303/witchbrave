@@ -6,6 +6,7 @@ import { sugarReady, applySugar } from './sugarglb.js';
 import { dragonReady, buildDragonGLB } from './dragonglb.js';
 import { darkReady, applyDark } from './darkglb.js';
 import { shadowReady, applyShadow } from './shadowglb.js';
+import { pvReady, applyPv } from './pvglb.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({
   color, roughness: o.r ?? .55, metalness: o.m ?? 0, emissive: o.e ?? 0x000000, emissiveIntensity: o.ei ?? 1, flatShading: o.flat ?? false,
@@ -111,6 +112,7 @@ export function buildCookie(def) {
   if (id === 'sugar' && sugarReady()) applySugar(rig);
   if (id === 'dark' && darkReady()) applyDark(rig);
   if (id === 'shadow' && shadowReady()) applyShadow(rig);
+  if (id === 'pv' && pvReady()) applyPv(rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

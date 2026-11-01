@@ -77,3 +77,5 @@
 - 모델: 올려준 `PUREVANILA.glb`(61MB, 99만 정점, 조각난 UV 아틀라스)는 줄이면 모양이 무너져 미적용. 지금은 `models.js` 임시 절차 모델. `src/pvglb.js`(미연결)는 glb 연결용 틀. 각성 모델(퓨바·쉐밀)은 별도로 받을 예정.
 - 탐험 맵(`startBattle(...,{explore})` → `setupExplore/updExplore`, game.js): 걸어다니며 몹(team 1)과 전투, 상자·함정·강·다리·동료 NPC·질문 관문, 몹 전멸 후 보스 등장. `raid.js`의 `yogurtMap`(실제 맵 요거트강), `dungeon`(탐험 던전). (상자·함정 설정 배열이 기본값 배열을 덮어써 for-of 가 무한 반복하던 버그 → `setupExplore` 에서 새 배열로 초기화해 수정).
 - 보스 크기 `fx.big`, 닉네임(`hub.askNick`, `SAVE.nick`), 미션창 출석/시즌패스 탭 연결, 가로 모드 안내(`#rotwarn`), 로딩 화면·레이드 컷신은 3D 모델 사진(`src/portrait.js`).
+- 퓨어바닐라 모델(수정판): `www/assets/models/pv/pv.fbx` + `pv_base.jpg`(2048, 원본 4096에서 축소). `src/pvglb.js` 가 FBXLoader 로 읽어 rig 에 올린다(리깅 없음 — 통째로 이동, 높이 2.35). 처음 받은 61MB glb 도 같은 캐릭터였는데 위에서 내려다본 화면이라 이상하게 보였던 것 → 틀린 판단이었음. 용량: 단일 HTML(아티팩트) 16MB 제한에 걸려서 pv 는 아티팩트 빌드에 못 넣음(서버/Pages 배포 필요). `scripts/build-single.cjs` 는 pv 미포함.
+- 던전 잡몹 4종(`mob_dough/jelly/soldier/mage`, HP 2000~3400, 도감/뽑기 제외)이 13마리 중 11마리, 고등급은 리치드래곤·어둠마녀 단 2마리 (`raid.js` `dungeon`).
