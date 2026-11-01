@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>gacha</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#2b1830}
+</style>
+
+</head>
+<body>
+
+<div style="position:relative;width:1280px;height:720px;overflow:hidden;background:#6fd3ff;font-family:'Jua','Noto Sans KR',sans-serif;color:#2b1830">
+
+<div style="position:absolute;left:0;top:0;width:1280px;height:720px;background:linear-gradient(to bottom,#6fd3ff 0,#b9e8ff 34%,#ffe0ef 70%)"></div>
+<div style="position:absolute;left:0;top:0;width:1280px;height:720px;background:rgba(43,24,48,.66)"></div>
+
+<div style="position:absolute;left:60px;top:36px;width:1160px;height:650px;box-sizing:border-box;overflow:hidden;background:#fff3df;border:4px solid #2b1830;border-radius:30px;box-shadow:0 8px 0 rgba(0,0,0,.35)">
+
+<div style="position:absolute;left:0;top:0;width:1152px;height:72px;background:#3a2048"></div>
+<div style="position:absolute;left:28px;top:10px;font-family:'Black Han Sans','Jua',sans-serif;font-size:36px;line-height:52px;color:#fff">뽑기</div>
+<div style="position:absolute;left:780px;top:16px;width:140px;height:40px;box-sizing:border-box;background:#2b1830;border:3px solid #fff3df;border-radius:20px">
+<svg aria-hidden="true" width="44" height="44" viewBox="0 0 44 44" style="position:absolute;left:-10px;top:-8px"><path d="M5 12h34v7a3 3 0 0 0 0 6v7H5v-7a3 3 0 0 0 0-6z" fill="#ff8fb1" stroke="#2b1830" stroke-width="3" stroke-linejoin="round"></path><path d="M16 14v16" stroke="#2b1830" stroke-width="2.5" stroke-dasharray="3 3"></path></svg>
+<span style="position:absolute;left:38px;top:0;line-height:34px;font-size:20px;color:#fff">12</span>
+</div>
+<div style="position:absolute;left:930px;top:16px;width:140px;height:40px;box-sizing:border-box;background:#2b1830;border:3px solid #fff3df;border-radius:20px">
+<svg aria-hidden="true" width="44" height="44" viewBox="0 0 44 44" style="position:absolute;left:-10px;top:-8px"><polygon points="22,4 38,16 22,40 6,16" fill="#3ddbb0" stroke="#2b1830" stroke-width="3" stroke-linejoin="round"></polygon><polyline points="6,16 38,16" fill="none" stroke="#2b1830" stroke-width="2.5"></polyline></svg>
+<span style="position:absolute;left:38px;top:0;line-height:34px;font-size:20px;color:#fff">1,250</span>
+</div>
+<button aria-label="닫기" style="position:absolute;right:16px;top:11px;width:48px;height:48px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ff5c8a;box-shadow:inset 0 -5px 0 rgba(0,0,0,.2),0 4px 0 #2b1830;cursor:pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="position:absolute;left:11px;top:11px"><path d="M3 3l14 14M17 3L3 17" stroke="#2b1830" stroke-width="3.5" stroke-linecap="round"></path></svg></button>
+
+<button aria-pressed="true" style="position:absolute;left:16px;top:92px;width:176px;height:56px;padding:0;border:3px solid #2b1830;border-radius:18px;background:#ff5c8a;box-shadow:inset 0 -5px 0 rgba(0,0,0,.2),0 4px 0 #2b1830;font-family:'Jua',sans-serif;font-size:22px;color:#2b1830;cursor:pointer;text-align:left"><span style="position:absolute;left:18px;top:0;line-height:50px">픽업 뽑기</span></button>
+<button aria-pressed="false" style="position:absolute;left:16px;top:158px;width:176px;height:56px;padding:0;border:3px solid #2b1830;border-radius:18px;background:#ffe4bd;box-shadow:0 4px 0 #2b1830;font-family:'Jua',sans-serif;font-size:22px;color:#2b1830;cursor:pointer;text-align:left"><span style="position:absolute;left:18px;top:0;line-height:50px">일반 뽑기</span></button>
+<button aria-pressed="false" style="position:absolute;left:16px;top:224px;width:176px;height:56px;padding:0;border:3px solid #2b1830;border-radius:18px;background:#ffe4bd;box-shadow:0 4px 0 #2b1830;font-family:'Jua',sans-serif;font-size:22px;color:#2b1830;cursor:pointer;text-align:left"><span style="position:absolute;left:18px;top:0;line-height:50px">코인 뽑기</span></button>
+<button style="position:absolute;left:16px;top:486px;width:176px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#fff;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:17px;color:#2b1830;cursor:pointer">확률 정보 상세</button>
+<button style="position:absolute;left:16px;top:544px;width:176px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#fff;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:17px;color:#2b1830;cursor:pointer">뽑기 기록</button>
+
+<div style="position:absolute;left:212px;top:92px;width:580px;height:404px;box-sizing:border-box;overflow:hidden;border:3px solid #2b1830;border-radius:26px;background:radial-gradient(ellipse 260px 220px at 50% 56%,rgba(255,255,255,.85),rgba(255,255,255,0)),repeating-conic-gradient(from 0deg at 50% 62%,#ffd873 0 10deg,#ffeaa6 10deg 20deg);box-shadow:0 4px 0 #2b1830">
+<span style="position:absolute;left:0;top:16px;width:574px;text-align:center;font-family:'Black Han Sans','Jua',sans-serif;font-size:40px;line-height:48px;color:#fff;-webkit-text-stroke:8px #2b1830;paint-order:stroke fill">별빛 소환</span>
+<span style="position:absolute;left:14px;top:14px;background:#ff5c8a;border:3px solid #2b1830;border-radius:14px;font-size:18px;line-height:24px;padding:0 14px">PICK UP</span>
+<span style="position:absolute;right:14px;top:14px;background:#2b1830;color:#fff;border-radius:14px;font-size:16px;line-height:28px;padding:0 14px">D-12</span>
+<svg aria-hidden="true" width="360" height="120" viewBox="0 0 420 140" style="position:absolute;left:107px;top:236px">
+<ellipse cx="210" cy="116" rx="196" ry="22" fill="#2b1830" opacity=".22"></ellipse>
+<ellipse cx="210" cy="100" rx="184" ry="30" fill="#c47d00" stroke="#2b1830" stroke-width="5"></ellipse>
+<rect x="26" y="70" width="368" height="30" fill="#ffb02e"></rect>
+<line x1="26" y1="70" x2="26" y2="100" stroke="#2b1830" stroke-width="5"></line>
+<line x1="394" y1="70" x2="394" y2="100" stroke="#2b1830" stroke-width="5"></line>
+<ellipse cx="210" cy="70" rx="184" ry="30" fill="#fff3df" stroke="#2b1830" stroke-width="5"></ellipse>
+<ellipse cx="210" cy="70" rx="140" ry="21" fill="none" stroke="#ffb02e" stroke-width="5" stroke-dasharray="14 10"></ellipse>
+</svg>
+<svg role="img" aria-label="3D 캐릭터 모델 자리" width="190" height="250" viewBox="0 0 200 330" style="position:absolute;left:192px;top:54px">
+<path d="M28 326 Q28 160 100 140 Q172 160 172 326 Z" fill="#fff" fill-opacity=".45" stroke="#2b1830" stroke-width="5" stroke-dasharray="12 9"></path>
+<circle cx="100" cy="82" r="60" fill="#fff" fill-opacity=".45" stroke="#2b1830" stroke-width="5" stroke-dasharray="12 9"></circle>
+<text x="100" y="226" text-anchor="middle" font-family="Jua, sans-serif" font-size="24" fill="#2b1830">3D 캐릭터</text>
+<text x="100" y="256" text-anchor="middle" font-family="Jua, sans-serif" font-size="24" fill="#2b1830">모델 자리</text>
+</svg>
+<g></g>
+<svg aria-hidden="true" width="40" height="40" viewBox="-20 -20 40 40" style="position:absolute;left:70px;top:120px"><polygon points="0,-14 4,-4 14,0 4,4 0,14 -4,4 -14,0 -4,-4" fill="#fff" stroke="#2b1830" stroke-width="2"></polygon></svg>
+<svg aria-hidden="true" width="30" height="30" viewBox="-20 -20 40 40" style="position:absolute;left:484px;top:90px"><polygon points="0,-14 4,-4 14,0 4,4 0,14 -4,4 -14,0 -4,-4" fill="#fff" stroke="#2b1830" stroke-width="2.4"></polygon></svg>
+<svg aria-hidden="true" width="34" height="34" viewBox="-20 -20 40 40" style="position:absolute;left:470px;top:230px"><polygon points="0,-14 4,-4 14,0 4,4 0,14 -4,4 -14,0 -4,-4" fill="#fff" stroke="#2b1830" stroke-width="2.2"></polygon></svg>
+<span style="position:absolute;left:150px;top:350px;width:274px;height:40px;box-sizing:border-box;border:3px solid #2b1830;border-radius:20px;background:#fff3df;text-align:center;font-size:23px;line-height:34px"><span style="background:#ffb02e;border:2px solid #2b1830;border-radius:10px;font-size:14px;line-height:18px;padding:0 8px;vertical-align:3px;margin-right:8px">전설</span>CHARACTER 07</span>
+</div>
+
+<div style="position:absolute;left:808px;top:92px;width:288px;height:176px;box-sizing:border-box;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830">
+<span style="position:absolute;left:16px;top:8px;font-size:20px;line-height:26px">확률 UP</span>
+<span style="position:absolute;left:12px;top:40px;width:260px;height:56px;display:flex;align-items:center;gap:10px">
+<span style="width:46px;height:46px;box-sizing:border-box;border:3px solid #2b1830;border-radius:14px;background:repeating-linear-gradient(45deg,#ffb02e 0,#ffb02e 8px,#ffd873 8px,#ffd873 16px)"></span>
+<span style="flex:1"><span style="display:block;font-size:17px;line-height:20px">CHARACTER 07</span><span style="display:block;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:12px;line-height:16px;color:#6b4a63">전설 · 딜러</span></span>
+<span style="background:#ff5c8a;border:2px solid #2b1830;border-radius:10px;font-size:14px;line-height:20px;padding:0 8px">1.2%</span>
+</span>
+<span style="position:absolute;left:12px;top:104px;width:260px;height:56px;display:flex;align-items:center;gap:10px">
+<span style="width:46px;height:46px;box-sizing:border-box;border:3px solid #2b1830;border-radius:14px;background:repeating-linear-gradient(45deg,#b57cff 0,#b57cff 8px,#cfa5ff 8px,#cfa5ff 16px)"></span>
+<span style="flex:1"><span style="display:block;font-size:17px;line-height:20px">CHARACTER 12</span><span style="display:block;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:12px;line-height:16px;color:#6b4a63">영웅 · 서포터</span></span>
+<span style="background:#ff5c8a;border:2px solid #2b1830;border-radius:10px;font-size:14px;line-height:20px;padding:0 8px">3.0%</span>
+</span>
+</div>
+
+<div style="position:absolute;left:808px;top:284px;width:288px;height:100px;box-sizing:border-box;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830">
+<span style="position:absolute;left:16px;top:8px;font-size:20px;line-height:26px">천장 카운트</span>
+<span style="position:absolute;right:16px;top:10px;font-size:20px;line-height:24px">38 / 90</span>
+<span style="position:absolute;left:16px;top:42px;width:250px;height:16px;box-sizing:border-box;border:3px solid #2b1830;border-radius:8px;background:#ffe4bd"><span style="position:absolute;left:0;top:0;width:42%;height:10px;border-radius:4px;background:#ff5c8a"></span></span>
+<span style="position:absolute;left:16px;top:66px;font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:12px;line-height:16px;color:#4d3a55">52회 안에 전설 캐릭터가 확정으로 나와요.</span>
+</div>
+
+<div style="position:absolute;left:808px;top:400px;width:288px;height:96px;box-sizing:border-box;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830">
+<span style="position:absolute;left:16px;top:6px;font-size:18px;line-height:24px">획득 확률</span>
+<span style="position:absolute;left:16px;top:34px;display:flex;align-items:center;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="width:10px;height:10px;background:#ffb02e;border:2px solid #2b1830"></span>전설 2.5%</span>
+<span style="position:absolute;left:150px;top:34px;display:flex;align-items:center;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="width:10px;height:10px;background:#b57cff;border:2px solid #2b1830"></span>영웅 9.5%</span>
+<span style="position:absolute;left:16px;top:60px;display:flex;align-items:center;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="width:10px;height:10px;background:#3ddbb0;border:2px solid #2b1830"></span>희귀 28%</span>
+<span style="position:absolute;left:150px;top:60px;display:flex;align-items:center;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="width:10px;height:10px;background:#9bb4c9;border:2px solid #2b1830"></span>일반 60%</span>
+</div>
+
+<button style="position:absolute;left:212px;top:514px;width:170px;height:84px;padding:0;border:3px solid #2b1830;border-radius:22px;background:#5cc8ff;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),inset 0 3px 0 rgba(255,255,255,.55),0 5px 0 #2b1830;cursor:pointer;color:#2b1830">
+<span style="position:absolute;left:0;top:10px;width:164px;text-align:center;font-family:'Jua',sans-serif;font-size:25px;line-height:30px">1회 뽑기</span>
+<span style="position:absolute;left:0;top:46px;width:164px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Jua',sans-serif;font-size:22px;line-height:26px"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#3ddbb0" stroke="#2b1830" stroke-width="3.5" stroke-linejoin="round"></polygon></svg>30</span>
+</button>
+<button style="position:absolute;left:394px;top:514px;width:250px;height:84px;padding:0;border:4px solid #2b1830;border-radius:24px;background:#ffc233;box-shadow:inset 0 -8px 0 rgba(0,0,0,.2),inset 0 4px 0 rgba(255,255,255,.6),0 6px 0 #2b1830;cursor:pointer;color:#2b1830">
+<span style="position:absolute;left:0;top:8px;width:242px;text-align:center;font-family:'Black Han Sans','Jua',sans-serif;font-size:30px;line-height:36px;color:#fff;-webkit-text-stroke:6px #2b1830;paint-order:stroke fill">10회 뽑기</span>
+<span style="position:absolute;left:0;top:48px;width:242px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Jua',sans-serif;font-size:23px;line-height:26px"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 44 44"><polygon points="22,4 38,16 22,40 6,16" fill="#3ddbb0" stroke="#2b1830" stroke-width="3.5" stroke-linejoin="round"></polygon></svg>270<span style="font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px;text-decoration:line-through;margin-left:4px">300</span></span>
+<span style="position:absolute;right:-10px;top:-14px;background:#d81e45;color:#fff;border:3px solid #2b1830;border-radius:14px;font-size:15px;line-height:20px;padding:0 9px">10% 할인</span>
+</button>
+<button style="position:absolute;left:656px;top:514px;width:136px;height:84px;padding:0;border:3px solid #2b1830;border-radius:22px;background:#ff5c8a;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),inset 0 3px 0 rgba(255,255,255,.55),0 5px 0 #2b1830;cursor:pointer;color:#2b1830">
+<span style="position:absolute;left:0;top:10px;width:130px;text-align:center;font-family:'Jua',sans-serif;font-size:21px;line-height:30px">티켓 사용</span>
+<span style="position:absolute;left:0;top:46px;width:130px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Jua',sans-serif;font-size:20px;line-height:26px"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 44 44"><path d="M5 12h34v7a3 3 0 0 0 0 6v7H5v-7a3 3 0 0 0 0-6z" fill="#fff3df" stroke="#2b1830" stroke-width="3.5" stroke-linejoin="round"></path></svg>x1</span>
+</button>
+
+<div style="position:absolute;left:808px;top:520px;width:288px;font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:13px;line-height:20px;color:#4d3a55">10회 뽑기에는 영웅 등급 이상이 1개 이상 반드시 포함돼요. 뽑기 전 확률 정보를 꼭 확인해주세요.</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 // DOM 기반 UI: 메뉴, HUD, 데미지 숫자, 컷신 레터박스/타이틀
 import * as THREE from 'three';
+import * as scr from './screens.js';
 
 const $ = s => document.querySelector(s);
 const v3 = new THREE.Vector3();
@@ -8,40 +9,34 @@ const hex = c => typeof c === 'number' ? '#' + c.toString(16).padStart(6, '0') :
 
 export function initUI(a) {
   api = a;
-  $('#start').onclick = () => api.start(api.picked(), $('#foe').value, $('#mode').value);
   $('#back').onclick = () => { $('#result').style.display = 'none'; api.back(); };
-  $('#cheat').onclick = () => { api.cheat(); buildMenu(); };
-  buildMenu();
+  scr.init(a);
 }
-export function buildMenu() {
-  const { CHARS, ORDER, SAVE } = api;
-  $('#coins').textContent = SAVE.coins;
-  const fs = $('#foe'); if (!fs.options.length) { ORDER.forEach(id => fs.add(new Option(CHARS[id].name, id))); fs.value = 'lich'; }
-  const grid = $('#grid'); grid.innerHTML = '';
-  for (const id of ORDER) {
-    const c = CHARS[id], un = SAVE.unlocked.includes(id), sk = c.skills.base;
-    const d = document.createElement('div'); d.className = 'card' + (api.picked() === id ? ' sel' : '') + (un ? '' : ' locked');
-    d.innerHTML = `<div class="name" style="color:${hex(c.color)}">${un ? '' : '🔒 '}${c.name}</div><div class="tag">HP ${c.hp.toLocaleString()} · ${c.tag}</div>` +
-      ['a', 'z', 'x', 'c', 'v'].map(k => `<div class="sk${c.tmp ? ' tmp' : ''}"><b>${k === 'a' ? '평타' : k.toUpperCase()} ${sk[k].name}</b> — ${sk[k].desc}</div>`).join('') +
-      ((c.dragon || c.witch) ? `<div class="sk"><b>변신 HP</b> ${(c.dragon || c.witch).hp.toLocaleString()}</div>` : '');
-    const b = document.createElement('button'); b.style.marginTop = '8px';
-    if (un) { b.textContent = api.picked() === id ? '선택됨' : '선택'; b.disabled = api.picked() === id; b.onclick = () => { api.pick(id); buildMenu(); }; }
-    else { b.textContent = `해금 (${c.cost} 코인)`; b.disabled = SAVE.coins < c.cost; b.onclick = () => { SAVE.coins -= c.cost; SAVE.unlocked.push(id); api.persist(); buildMenu(); }; }
-    d.appendChild(b);
-    if (un && c.awake) {
-      const done = SAVE.awake.includes(id), n = SAVE.wins[id] || 0, need = c.awake.wins;
-      const a = document.createElement('div'); a.className = 'sk'; a.style.marginTop = '6px';
-      a.innerHTML = done ? '<b>✦ 각성 완료</b> — V 스킬 해금' : `<b>각성 조건</b> — ${c.awake.desc} (${Math.min(n, need)}/${need})`;
-      d.appendChild(a);
-      if (!done) { const ab = document.createElement('button'); ab.textContent = '각성하기'; ab.disabled = n < need; ab.style.marginTop = '6px'; ab.onclick = () => { SAVE.awake.push(id); api.persist(); buildMenu(); }; d.appendChild(ab); }
-    }
-    grid.appendChild(d);
-  }
+export const buildMenu = () => scr.refresh();
+export const refreshLobby = () => scr.refresh();
+export const recordMatch = (S, id, win) => scr.recordMatch(S, id, win);
+export const getView = () => scr.getView();
+export const previewId = () => scr.previewId();
+
+// 브롤스타즈식 입장 연출: 양쪽에서 캐릭터 이름이 날아들고 VS, 3-2-1 카운트다운 뒤 전투 시작
+let introTimers = [];
+export function intro(fs, done) {
+  introTimers.forEach(clearTimeout); introTimers = [];
+  const el = $('#intro'), cd = el.querySelector('.cd'), [l, r] = [el.querySelector('.ip.l'), el.querySelector('.ip.r')];
+  const card = (box, f, side) => { box.innerHTML = '<small>' + side + '</small><b style="color:' + hex(f.def.color) + ';filter:brightness(1.6)">' + f.def.name + '</b><small>' + f.def.tag + ' · HP ' + f.max.toLocaleString() + (f.shieldMax ? ' · 🛡' + f.shieldMax.toLocaleString() : '') + '</small>'; };
+  card(l, fs[0], '1P'); card(r, fs[1], fs[1].ctrl.kind === 'ai' ? 'CPU' : '2P');
+  el.className = 'on'; cd.className = 'cd'; cd.textContent = '';
+  const at = (ms, fn) => introTimers.push(setTimeout(fn, ms));
+  at(60, () => el.classList.add('show'));
+  at(1900, () => el.classList.add('count'));
+  ['3', '2', '1', '시작!'].forEach((t, i) => at(2000 + i * 650, () => { cd.className = 'cd'; void cd.offsetWidth; cd.textContent = t; cd.classList.add('pop'); }));
+  at(2000 + 4 * 650 + 200, () => { el.className = ''; done && done(); });
 }
+export function introCancel() { introTimers.forEach(clearTimeout); introTimers = []; $('#intro').className = ''; }
 
 export function showGame(on) {
-  $('#menu').style.display = on ? 'none' : 'block';
-  $('#game').style.display = on ? 'block' : 'none';
+  const g = $('#game'); g.style.display = 'block'; g.classList.toggle('lobbymode', !on);
+  if (on) scr.hide(); else { $('#hud').innerHTML = ''; $('#result').style.display = 'none'; scr.open('lobby'); }
 }
 
 export function beginBattle(B) {
@@ -53,7 +48,7 @@ export function beginBattle(B) {
     const p = document.createElement('div'); p.className = 'panel ' + (i ? 'right' : 'left');
     p.innerHTML = `<div class="pname" style="color:${hex(f.def.color)}">${f.def.name}<span class="form"></span></div>
       <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><div class="shfill"></div><span class="hptxt"></span></div>
-      ${mine ? `<div class="skills">${['z', 'x', 'c', 'v'].map((k, j) => `<div class="slot" data-k="${k}"><i>${keys[j]}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
+      ${mine ? `<div class="skills">${['z', 'x', 'c', 'v', 'q', 'r'].filter(k => f.def.skills.base[k]).map((k, j) => `<div class="slot" data-k="${k}"><i>${f.ctrl.kind === 'h2' ? { z: '7', x: '8', c: '9', v: '0', q: '6', r: '-' }[k] : k.toUpperCase()}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
     root.appendChild(p);
     const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="mini"><div></div></div><div class="ic"></div>'; root.appendChild(tag);
     hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), sh: p.querySelector('.shfill'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
@@ -74,17 +69,18 @@ export function update(B, camera, renderer, dt) {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
       s.querySelector('.cdt').textContent = cd > 0 ? cd.toFixed(1) : (f.def.id === 'lich' && f.form === 'base' && k === 'v' && !f.awake ? '🔒' : '');
-      s.classList.toggle('ready', cd <= 0);
+      s.classList.toggle('ready', cd <= 0 && (k !== 'r' || (f.awake && f.gauge >= 100)));
+      if (k === 'r') { s.querySelector('.cdt').textContent = !f.awake ? '🔒' : f.gauge >= 100 ? 'READY' : Math.floor(f.gauge) + '%'; s.querySelector('.cdm').style.height = f.awake ? (100 - Math.min(100, f.gauge)) + '%' : '100%'; }
     });
   }
   for (const t of hud.tags) {
     const f = t.f; v3.set(f.root.position.x, f.root.position.y + (f.form === 'dragon' ? 6.4 : 2.9), f.root.position.z).project(camera);
-    const vis = v3.z < 1 && f.hp > 0 && !B.cut;
+    const vis = v3.z < 1 && f.hp > 0 && !B.cut && !f.hidden;
     t.el.style.display = vis ? 'block' : 'none';
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
     let ic = ''; const s = f.st;
-    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳';
+    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
     t.ic.textContent = ic;
   }
   for (let i = pops.length - 1; i >= 0; i--) {

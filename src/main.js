@@ -3,4 +3,11 @@ import { preloadLich, preloadAxe } from './lichglb.js';
 import { preloadSugar } from './sugarglb.js';
 import { preloadDragon } from './dragonglb.js';
 import { preloadDark } from './darkglb.js';
-Promise.all([preloadLich(), preloadSugar(), preloadAxe(), preloadDragon(), preloadDark()]).then(init);
+import { preloadShadow } from './shadowglb.js';
+import * as scr from './screens.js';
+
+// 로딩 화면을 먼저 띄우고, 모델이 하나씩 불러와질 때마다 진행도를 올린다.
+scr.bootLoading();
+const jobs = [preloadLich(), preloadSugar(), preloadAxe(), preloadDragon(), preloadDark(), preloadShadow()];
+let n = 0; jobs.forEach(p => p.then(() => scr.setProgress(++n / jobs.length)));
+Promise.all(jobs).then(() => new Promise(r => setTimeout(r, 700))).then(init);

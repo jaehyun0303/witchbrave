@@ -8,5 +8,5 @@ const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 100)
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(2, 3, 4); scene.add(d);
 const ctl = new OrbitControls(cam, r.domElement); ctl.target.set(0, 0.5, 0);
 const m = new URLSearchParams(location.search).get('m') || 'sugar';
-new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load('assets/models/' + m + '.glb', g => { scene.add(g.scene); window.__scene = g.scene; const s = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3()); document.title = s.toArray().map(v => v.toFixed(2)).join('x'); });
+new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load('assets/models/' + m + '.glb', g => { scene.add(g.scene); window.__scene = g.scene; const bx = new THREE.Box3().setFromObject(g.scene), s = bx.getSize(new THREE.Vector3()), ctr = bx.getCenter(new THREE.Vector3()); ctl.target.copy(ctr); cam.position.set(ctr.x + .0, ctr.y + s.y * .1, ctr.z + Math.max(s.x, s.y) * 1.9); ctl.update(); document.title = s.toArray().map(v => v.toFixed(2)).join('x'); });
 r.setAnimationLoop(() => { ctl.update(); r.render(scene, cam); });

@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>위치브레이브 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0d0a1a;--panel:#1a1430;--line:#3a2f66;--ink:#eee8ff;--dim:#9a90c4;--gold:#ffd166}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,"Noto Sans KR",sans-serif;overflow-x:hidden}
-  #menu{width:min(1100px,100%);margin:0 auto;padding:16px}
   h1{margin:0 0 4px;letter-spacing:.05em}
   .sub{color:var(--dim);font-size:14px;margin-bottom:12px}
   .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}
@@ -63,27 +63,55 @@
   #result{position:absolute;inset:0;background:#000b;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-size:34px;font-weight:800;z-index:10}
   #result small{font-size:16px;font-weight:400;color:var(--gold)}
   #hint{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);font-size:12px;color:#fff8;pointer-events:none}
+  #intro{position:absolute;inset:0;display:none;z-index:50;overflow:hidden;pointer-events:none;font-family:system-ui,"Noto Sans KR",sans-serif}
+  #intro.on{display:block}
+  #intro .bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,#2a1a66aa,#05030fdd 70%);opacity:0;transition:opacity .35s}
+  #intro.show .bg{opacity:1}
+  #intro .ip{position:absolute;top:50%;width:46%;height:56%;transform:translateY(-50%);display:flex;flex-direction:column;justify-content:center;gap:10px;padding:0 4%;color:#fff;transition:transform .55s cubic-bezier(.2,.9,.2,1),opacity .4s;opacity:0}
+  #intro .ip.l{left:0;background:linear-gradient(100deg,#3a8cffcc,#3a8cff00);transform:translate(-110%,-50%) skewX(-8deg)}
+  #intro .ip.r{right:0;text-align:right;align-items:flex-end;background:linear-gradient(260deg,#ff5a5acc,#ff5a5a00);transform:translate(110%,-50%) skewX(-8deg)}
+  #intro.show .ip{opacity:1}#intro.show .ip.l{transform:translate(0,-50%) skewX(-8deg)}#intro.show .ip.r{transform:translate(0,-50%) skewX(-8deg)}
+  #intro .ip b{font-size:clamp(26px,4.4vw,64px);letter-spacing:.02em;text-shadow:0 4px 18px #000a}
+  #intro .ip small{font-size:clamp(13px,1.6vw,22px);opacity:.85}
+  #intro .vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0);font-size:clamp(60px,10vw,150px);font-weight:900;color:#ffd166;text-shadow:0 0 30px #ffb300,0 6px 0 #7a4a00;transition:transform .45s cubic-bezier(.3,1.6,.4,1) .35s}
+  #intro.show .vs{transform:translate(-50%,-50%) scale(1)}
+  #intro.count .ip,#intro.count .vs{opacity:0;transition:opacity .25s}
+  #intro .cd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:clamp(90px,16vw,240px);font-weight:900;color:#fff;text-shadow:0 0 40px #8f7bff,0 8px 0 #3a2a99;opacity:0}
+  #intro .cd.pop{animation:cdpop .6s ease-out}
+  @keyframes cdpop{0%{transform:translate(-50%,-50%) scale(2.2);opacity:0}25%{opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+  #lobby{position:fixed;inset:0;z-index:20;display:none;pointer-events:none;color:var(--ink);font-family:system-ui,"Noto Sans KR",sans-serif}
+  #lobby button,#lobby select,#lobby label{pointer-events:auto}
+  .lb-top{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:linear-gradient(#05030fcc,#05030f00)}
+  .lb-profile{display:flex;flex-direction:column;gap:2px;font-size:13px}.lb-profile b{font-size:18px}.lb-profile span{color:var(--gold);font-weight:700}
+  .lb-icon{width:44px;height:44px;border-radius:12px;font-size:22px;padding:0}
+  .lb-left{position:absolute;left:18px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:12px}
+  .lb-nav{position:relative;width:92px;height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:14px;background:#1a1430dd;border:2px solid #5a4aa6;font-size:14px;font-weight:700}
+  .lb-nav i{font-style:normal;font-size:28px}.lb-nav:hover{border-color:#b6a4ff;background:#2a2060e6}
+  .lb-nav em{position:absolute;top:6px;right:8px;width:12px;height:12px;border-radius:50%;background:#ff4f6d;display:none}.lb-nav em.on{display:block}
+  .lb-info{position:absolute;left:0;right:0;bottom:130px;text-align:center;text-shadow:0 3px 14px #000}
+  #lname{font-size:clamp(24px,3.4vw,44px);font-weight:900;letter-spacing:.02em}#lsub{font-size:14px;color:#cfc6f5;margin-top:4px}
+  .lb-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:18px;background:linear-gradient(#05030f00,#05030fcc);flex-wrap:wrap}
+  .lb-mode{display:flex;gap:10px;flex-wrap:wrap;font-size:13px}.lb-mode label{display:flex;flex-direction:column;gap:4px;color:var(--dim)}
+  .lb-play{min-width:210px;height:76px;font-size:32px;font-weight:900;letter-spacing:.08em;border-radius:14px;color:#3a2200;background:linear-gradient(#ffe27a,#ffb300);border:3px solid #fff3b0;box-shadow:0 6px 0 #a86a00,0 10px 30px #ffb30066}
+  .lb-play:hover:not(:disabled){filter:brightness(1.08);border-color:#fff}
+  .panel{position:fixed;inset:0;z-index:40;background:#0d0a1af5;overflow:auto;display:none}.panel.open{display:block}
+  .pbody{width:min(1100px,100%);margin:0 auto;padding:16px}
+  .phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.phead h2{margin:0}
+  .evgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:12px}
+  .evc{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+  .evc.done{border-color:#7dff9b}.evc b{font-size:16px}.evc .pb{height:10px;background:#000a;border-radius:6px;overflow:hidden}.evc .pb i{display:block;height:100%;background:linear-gradient(#ffe27a,#ffb300)}
+  .evc .rw{color:var(--gold);font-weight:700}
+  .gbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .gtable{font-size:13px;color:var(--dim);margin-bottom:10px;line-height:1.6}
+  .gres{display:flex;flex-wrap:wrap;gap:10px}
+  .gr{min-width:120px;padding:10px 12px;border-radius:10px;background:var(--panel);border:2px solid var(--line);animation:grpop .5s ease-out both;font-weight:700}
+  .gr.c{border-color:#ffd166;color:#ffd166}.gr.n{border-color:#b6a4ff;color:#e9e0ff;box-shadow:0 0 18px #b6a4ff88}
+  @keyframes grpop{0%{transform:scale(.4) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+  #game.lobbymode{background:transparent;pointer-events:none;z-index:60}
 </style>
 </head>
 <body>
-<div id="menu">
-  <h1>⚔ 위치브레이브 <span style="font-size:14px;color:var(--dim)">3D</span></h1>
-  <div class="sub">캐릭터를 해금하고 선택해서 싸우는 스킬 PvP (Three.js 프로토타입)</div>
-  <div class="bar">
-    <span>보유 코인: <span class="coins" id="coins">0</span></span>
-    <label>모드 <select id="mode"><option value="ai">1P vs AI</option><option value="local">로컬 2P</option></select></label>
-    <label>상대 <select id="foe"></select></label>
-    <button class="go" id="start">전투 시작</button>
-    <button id="cheat" title="테스트용">테스트: 전체 해금</button>
-  </div>
-  <div class="grid" id="grid"></div>
-  <div class="help">
-    <b>조작 (1P)</b> 이동 WASD · 평타 Space 또는 마우스 클릭 · 스킬 Z X C V · 조준은 마우스 (지정 위치 스킬은 마우스가 가리키는 바닥)<br>
-    <b>시점</b> 우클릭 드래그 또는 Q/E 회전 · 휠 줌 · 드래그로 위아래 각도 · T 내 캐릭터 추적 ↔ 둘 다 보기 (이동은 화면 기준)<br>
-    <b>조작 (2P, 로컬)</b> 이동 방향키 · 평타 Enter · 스킬 7 8 9 0 · 자동으로 상대를 조준<br>
-    승리 +300 코인, 패배 +100 코인. 코인으로 캐릭터를 해금합니다.
-  </div>
-</div>
+<div id="intro"><div class="bg"></div><div class="ip l"></div><div class="ip r"></div><div class="vs">VS</div><div class="cd"></div></div>
 <div id="game" class="bars">
   <canvas id="cv"></canvas>
   <div id="hud"></div>

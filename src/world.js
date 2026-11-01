@@ -26,8 +26,8 @@ function skyDome(top, mid, bot, stars) {
 }
 
 export function createWorld(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
@@ -37,19 +37,19 @@ export function createWorld(canvas) {
   /* ----- 조명 ----- */
   const hemi = new THREE.HemisphereLight(0x8c88ff, 0x1a1030, .6); scene.add(hemi);
   const moonL = new THREE.DirectionalLight(0xb4bfff, 1.25); moonL.position.set(-14, 30, 12); moonL.castShadow = true;
-  moonL.shadow.mapSize.set(2048, 2048); Object.assign(moonL.shadow.camera, { left: -32, right: 32, top: 22, bottom: -22, near: 1, far: 90 }); moonL.shadow.bias = -.0004;
+  moonL.shadow.mapSize.set(1024, 1024); Object.assign(moonL.shadow.camera, { left: -48, right: 48, top: 30, bottom: -30, near: 1, far: 130 }); moonL.shadow.bias = -.0004;
   scene.add(moonL, moonL.target);
   const rimL = new THREE.DirectionalLight(0xff8ad8, .5); rimL.position.set(20, 10, -18); scene.add(rimL);
 
   /* ----- 메인 아레나 ----- */
   const arena = new THREE.Group(); scene.add(arena);
   const sky = skyDome(0x050314, 0x241446, 0x0a0618, 0xcfd8ff); arena.add(sky);
-  const ft = tex('floor'); ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(3, 2);
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(48, 1.2, 28), new THREE.MeshStandardMaterial({ map: ft, roughness: .9, metalness: 0, color: 0x7a72b8 }));
+  const ft = tex('floor'); ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(5, 3);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(72, 1.2, 41), new THREE.MeshStandardMaterial({ map: ft, roughness: .9, metalness: 0, color: 0x7a72b8 }));
   floor.position.y = -.6; floor.receiveShadow = true; arena.add(floor);
-  const rim = new THREE.Mesh(new THREE.BoxGeometry(48.6, .14, 28.6), new THREE.MeshBasicMaterial({ color: 0x6a58ff }));
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(72.6, .14, 41.6), new THREE.MeshBasicMaterial({ color: 0x6a58ff }));
   rim.position.y = .02; rim.scale.set(1, 1, 1); arena.add(rim); rim.position.y = -.05; rim.renderOrder = -1;
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(48, .02, 28)), new THREE.LineBasicMaterial({ color: 0x9a8aff })); edge.position.y = .01; arena.add(edge);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(72, .02, 41)), new THREE.LineBasicMaterial({ color: 0x9a8aff })); edge.position.y = .01; arena.add(edge);
   const centerRune = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: tex('rune'), color: 0x6a58ff, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false }));
   centerRune.rotation.x = -Math.PI / 2; centerRune.position.y = .03; arena.add(centerRune);
   // 하단 떠다니는 바위
@@ -109,6 +109,17 @@ export function createWorld(canvas) {
     setParadise(on) {
       floor.material.color.set(on ? 0xffc9e8 : 0x7a72b8); scene.fog.color.set(on ? 0xf4b8dc : 0x120a2a); scene.fog.density = on ? .005 : .0085;
       hemi.color.set(on ? 0xffd6f0 : 0x8c88ff);
+    },
+    // 품질 단계: 0 = 기본, 1 = 그림자·블룸 끔 + 해상도 1배 (프레임이 느릴 때 자동 전환)
+    quality: 0,
+    setQuality(q) {
+      this.quality = q; renderer.setPixelRatio(q === 0 ? Math.min(devicePixelRatio, 1.5) : 1); moonL.castShadow = q === 0; bloom.enabled = q === 0; resize();
+    },
+    // 로비/메뉴: 투명 배경 위에 캐릭터만 그린다 (배경·바닥·안개는 UI 가 담당)
+    setLobby(on) {
+      arena.visible = !on; if (on) mind.visible = false; renderer.setClearColor(0x000000, on ? 0 : 1); scene.fog.density = on ? 0 : .0085;
+      hemi.color.set(on ? 0xffffff : 0x8c88ff); hemi.groundColor.set(on ? 0xffd6e8 : 0x1a1030); hemi.intensity = on ? 1.5 : .6;
+      moonL.color.set(on ? 0xffffff : 0xb4bfff); moonL.intensity = on ? 1.7 : 1.25; rimL.intensity = on ? .9 : .5;
     },
     setCut(on) {
       moonL.intensity = on ? .35 : 1.25; hemi.intensity = on ? .25 : .6; renderer.toneMappingExposure = on ? .9 : 1.05;

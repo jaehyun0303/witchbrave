@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>mode-select</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#2b1830}
+</style>
+
+</head>
+<body>
+
+<div style="position:relative;width:1280px;height:720px;overflow:hidden;background:#6fd3ff;font-family:'Jua','Noto Sans KR',sans-serif;color:#2b1830">
+
+<div style="position:absolute;left:0;top:0;width:1280px;height:720px;background:linear-gradient(to bottom,#6fd3ff 0,#b9e8ff 34%,#ffe0ef 70%)"></div>
+<div style="position:absolute;left:0;top:0;width:1280px;height:720px;background:rgba(43,24,48,.66)"></div>
+
+<div style="position:absolute;left:120px;top:36px;width:1040px;height:650px;box-sizing:border-box;overflow:hidden;background:#fff3df;border:4px solid #2b1830;border-radius:30px;box-shadow:0 8px 0 rgba(0,0,0,.35)">
+
+<div style="position:absolute;left:0;top:0;width:1032px;height:72px;background:#3a2048"></div>
+<div style="position:absolute;left:28px;top:10px;font-family:'Black Han Sans','Jua',sans-serif;font-size:36px;line-height:52px;color:#fff">모드 선택</div>
+<button aria-label="닫기" style="position:absolute;right:16px;top:11px;width:48px;height:48px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ff5c8a;box-shadow:inset 0 -5px 0 rgba(0,0,0,.2),0 4px 0 #2b1830;cursor:pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="position:absolute;left:11px;top:11px"><path d="M3 3l14 14M17 3L3 17" stroke="#2b1830" stroke-width="3.5" stroke-linecap="round"></path></svg></button>
+
+<button aria-pressed="true" style="position:absolute;left:20px;top:86px;width:96px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ffb02e;box-shadow:inset 0 -4px 0 rgba(0,0,0,.2),0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:20px;color:#2b1830;cursor:pointer">일반</button>
+<button aria-pressed="false" style="position:absolute;left:126px;top:86px;width:96px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ffe4bd;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:20px;color:#2b1830;cursor:pointer">랭크</button>
+<button aria-pressed="false" style="position:absolute;left:232px;top:86px;width:110px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#ffe4bd;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:20px;color:#2b1830;cursor:pointer">이벤트<span style="position:absolute;right:-6px;top:-8px;width:16px;height:16px;border:3px solid #2b1830;border-radius:11px;background:#d81e45"></span></button>
+
+<button aria-pressed="true" style="position:absolute;left:20px;top:144px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;outline:5px solid #ffb02e;outline-offset:2px;cursor:pointer;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#5cc8ff 0,#5cc8ff 18px,#8fdcff 18px,#8fdcff 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><circle cx="30" cy="34" r="18" fill="none" stroke="#2b1830" stroke-width="3" stroke-dasharray="6 5"></circle><path d="M24 48V10" stroke="#2b1830" stroke-width="3" stroke-linecap="round"></path><path d="M24 11h20l-5 7 5 7H24z" fill="#fff" stroke="#2b1830" stroke-width="3" stroke-linejoin="round"></path></svg>
+<span style="position:absolute;left:10px;top:10px;background:#ffb02e;border:3px solid #2b1830;border-radius:12px;font-size:15px;line-height:20px;padding:0 10px;color:#2b1830">선택됨</span>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#2b1830">3v3 점령</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">3 vs 3</span><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">거점 점령</span></span>
+</button>
+
+<button aria-pressed="false" style="position:absolute;left:356px;top:144px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;cursor:pointer;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#ff8fb1 0,#ff8fb1 18px,#ffb6d1 18px,#ffb6d1 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><g fill="#fff" stroke="#2b1830" stroke-width="2.5"><circle cx="50" cy="30" r="4.5"></circle><circle cx="44.1" cy="44.1" r="4.5"></circle><circle cx="30" cy="50" r="4.5"></circle><circle cx="15.9" cy="44.1" r="4.5"></circle><circle cx="10" cy="30" r="4.5"></circle><circle cx="15.9" cy="15.9" r="4.5"></circle><circle cx="30" cy="10" r="4.5"></circle><circle cx="44.1" cy="15.9" r="4.5"></circle></g><circle cx="30" cy="30" r="8" fill="#ffd45c" stroke="#2b1830" stroke-width="3"></circle></svg>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#2b1830">서바이벌</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">10인 개인전</span><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">최후의 1인</span></span>
+</button>
+
+<button aria-pressed="false" style="position:absolute;left:692px;top:144px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;cursor:pointer;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#ffc233 0,#ffc233 18px,#ffdf85 18px,#ffdf85 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><polygon points="30,6 50,22 30,54 10,22" fill="#fff" stroke="#2b1830" stroke-width="3" stroke-linejoin="round"></polygon><path d="M10 22h40M20 22l10-16 10 16-10 32z" fill="none" stroke="#2b1830" stroke-width="2.5" stroke-linejoin="round"></path></svg>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#2b1830">보물 쟁탈</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">3 vs 3</span><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">보석 10개 모으기</span></span>
+</button>
+
+<button aria-pressed="false" style="position:absolute;left:20px;top:356px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;cursor:pointer;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#b57cff 0,#b57cff 18px,#cfa5ff 18px,#cfa5ff 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><polygon points="30,3 35,17 49,10 43,24 57,30 43,36 49,50 35,43 30,57 25,43 11,50 17,36 3,30 17,24 11,10 25,17" fill="#fff" stroke="#2b1830" stroke-width="3" stroke-linejoin="round"></polygon></svg>
+<span style="position:absolute;right:10px;top:10px;background:#2b1830;color:#fff;border-radius:12px;font-size:15px;line-height:22px;padding:0 10px">D-3</span>
+<span style="position:absolute;left:10px;top:10px;background:#ff5c8a;border:3px solid #2b1830;border-radius:12px;font-size:15px;line-height:20px;padding:0 10px;color:#2b1830">이벤트</span>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#2b1830">보스 레이드</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">4인 협동</span><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">보스 처치</span></span>
+</button>
+
+<button aria-pressed="false" style="position:absolute;left:356px;top:356px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;cursor:pointer;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#3ddbb0 0,#3ddbb0 18px,#79ebcc 18px,#79ebcc 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><path d="M12 12l36 36M48 12L12 48" stroke="#2b1830" stroke-width="8" stroke-linecap="round"></path><path d="M12 12l36 36M48 12L12 48" stroke="#fff" stroke-width="3" stroke-linecap="round"></path></svg>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#2b1830">1v1 결투</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px"><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">1 vs 1</span><span style="background:#ffe4bd;border:2px solid #2b1830;border-radius:9px;line-height:18px;padding:0 8px">먼저 3승</span></span>
+</button>
+
+<button aria-pressed="false" aria-disabled="true" style="position:absolute;left:692px;top:356px;width:320px;height:196px;padding:0;overflow:hidden;border:3px solid #2b1830;border-radius:22px;background:#fff;box-shadow:0 4px 0 #2b1830;cursor:not-allowed;text-align:left">
+<span style="position:absolute;left:0;top:0;width:314px;height:118px;background:repeating-linear-gradient(45deg,#a9a3b8 0,#a9a3b8 18px,#c3bed0 18px,#c3bed0 36px);border-bottom:3px solid #2b1830"></span>
+<svg aria-hidden="true" width="84" height="84" viewBox="0 0 60 60" style="position:absolute;left:115px;top:16px"><rect x="14" y="26" width="32" height="26" rx="5" fill="#fff" stroke="#2b1830" stroke-width="3"></rect><path d="M20 26v-6a10 10 0 0 1 20 0v6" fill="none" stroke="#2b1830" stroke-width="3"></path><circle cx="30" cy="38" r="3.5" fill="#2b1830"></circle></svg>
+<span style="position:absolute;right:10px;top:10px;background:#2b1830;color:#fff;border-radius:12px;font-size:15px;line-height:22px;padding:0 10px">Lv 15 해금</span>
+<span style="position:absolute;left:14px;top:126px;font-size:26px;line-height:30px;color:#4d3a55">랭크 매치</span>
+<span style="position:absolute;left:14px;top:160px;display:flex;gap:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px;color:#4d3a55"><span style="background:#e6e0ee;border:2px solid #4d3a55;border-radius:9px;line-height:18px;padding:0 8px">3 vs 3</span><span style="background:#e6e0ee;border:2px solid #4d3a55;border-radius:9px;line-height:18px;padding:0 8px">시즌 랭킹</span></span>
+</button>
+
+<div style="position:absolute;left:20px;top:568px;width:992px;height:60px">
+<div style="position:absolute;left:0;top:2px;font-size:24px;line-height:28px">3v3 점령</div>
+<div style="position:absolute;left:0;top:32px;font-family:'Noto Sans KR',sans-serif;font-weight:500;font-size:14px;line-height:20px;color:#4d3a55">3명이 한 팀이 되어 맵 중앙의 거점을 먼저 점령하세요. 제한 시간 3분.</div>
+<button style="position:absolute;right:0;top:0;width:240px;height:56px;padding:0;border:3px solid #2b1830;border-radius:20px;background:#ffc233;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),inset 0 3px 0 rgba(255,255,255,.55),0 4px 0 #2b1830;font-family:'Jua',sans-serif;font-size:26px;color:#2b1830;cursor:pointer">선택하기</button>
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

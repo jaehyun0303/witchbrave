@@ -83,7 +83,8 @@ export class VFX {
       smoke: new Emitter(scene, 'smoke', 800, THREE.NormalBlending),
     };
   }
-  emit(t, o) { this.em[t].emit(o); }
+  emit(t, o) { if (this.density < 1 && Math.random() > this.density) return; this.em[t].emit(o); }   // density: 낮은 품질에서 입자 일부를 건너뜀
+  density = 1;
 
   update(dt, scale) {
     for (const k in this.em) this.em[k].update(dt, scale);
