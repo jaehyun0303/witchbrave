@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { buildCookie } from './models.js';
 
-const DEF = { shadow: { id: 'shadow', color: 0x3a7bff }, pv: { id: 'pv', color: 0xfff0a8 } };
+const DEF = { silent: { id: 'silent', color: 0x8fa4ff }, shadow: { id: 'shadow', color: 0x3a7bff }, pv: { id: 'pv', color: 0xfff0a8 } };
 const cache = {};
 export function portraitURL(id, turn = 0) {
   const key = id + turn; if (cache[key]) return cache[key];
