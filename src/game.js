@@ -43,8 +43,11 @@ function hurt(src, t, n, o = {}) {
   if (src && src !== t && B.barriers.length && inBarrier(src, t)) { if (!o.quiet) ui.pop(P3(t, 2.6), '막힘!', '#fff3b0'); return; }
   let d = n * (src ? dmgMul(src) : 1) * (1 - defRed(t));
   if (t.drT > 0) d *= 1 - t.drV;
+  const dk = src && src !== t && src.def.id === 'dark';   // 어둠마녀 패시브: 보호막 흡수 20% (적중마다, 지속 피해 제외) + 피해 10% 관통
+  if (dk && t.shield > 0 && !o.field) { const ab = t.shield * .2; t.shield -= ab; src.shield += ab; src.shieldMax = Math.max(src.shieldMax, src.shield); if (ab >= 1) ui.pop(P3(src, 3.2), '🛡 +' + Math.round(ab), '#ff8a98'); }
+  const pierce = dk ? d * .1 : 0; if (dk) d -= pierce;
   let hpD = d; if (t.shield > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; hpD = d - ab; }
-  t.hp = Math.max(0, t.hp - hpD); t.flash = .12;
+  t.hp = Math.max(0, t.hp - hpD - pierce); t.flash = .12; d += pierce;
   if (B.raid && t === B.raid.boss && src === B.fighters[0]) B.raid.dmg += d;
   if (src && src !== t && src.def.ult && !src.hidden) src.gauge = Math.min(100, src.gauge + n / (src.def.ult.need / 100));
   const big = d >= 800;
@@ -610,14 +613,14 @@ function reviveBody(f) {
   ui.pop(P3(f, 3.6), '몸으로 부활!', '#7dff9b');
 }
 CHARS.sugar = {
-  id: 'sugar', name: '이터널슈가 쿠키', color: 0xff8ad0, cost: 800, hp: 10000, shield: 40000, pref: 5.5, atkRange: 520, tag: '시작 보호막 40,000 · 호수 · 수면 · 설탕 낙원',
+  id: 'sugar', name: '이터널슈가 쿠키', color: 0xff8ad0, cost: 800, hp: 10000, shield: 30000, pref: 5.5, atkRange: 520, tag: '시작 보호막 30,000 · 호수 · 수면 · 설탕 낙원',
   skills: {
     base: {
       a: { name: '핑크빛 돌', cd: 1.2, desc: '하늘에서 핑크빛 돌을 떨어뜨림. 데미지 500', use(f, p) { setAnim(f, 'cast', .3); const q = clampRange(f, p, 560); zone(f, { x: q.x, y: q.y, r: 60, delay: .5, dmg: 500, color: 0xff8ad0, rock: true }); } },
       z: { name: '딸기잼 호수', cd: 14, desc: '아주 넓은 딸기잼 호수 생성. 강한 슬로우 + 초당 1000 (5초 유지)', use(f, p) { setAnim(f, 'cast', .6); const q = clampRange(f, p, 560); makeLake(f, { kind: 'lake', x: q.x, y: q.y, r: 300, dur: 5, dps: 1000, slowF: .25, color: 0xd81b4a, hi: 0xff7a9c }); ui.flash('#ff4f7d', .25, .3); } },
       x: { name: '설탕 호수', cd: 8, desc: '일직선으로 광역 핑크빛 설탕 호수를 만들며 데미지. 4000', use(f) { setAnim(f, 'cast', .5); makeLake(f, { kind: 'strip', x: f.x, y: f.y, a: f.face, len: 760, wid: 170, dur: 1.8, dmg: 4000, color: 0xff9ad8, hi: 0xffffff }); } },
-      c: { name: '수면', cd: 25, desc: '5초간 수면. 받는 피해 60% 감소, 체력 20% · 보호막 20% 회복', use(f) { startSleep(f); } },
-      v: { name: '설탕낙원', cd: 50, desc: '지형이 설탕 낙원으로 변하고 꽃 위에서 수면. 받는 피해 80% 감소, 체력 35% · 보호막 40% 회복. 설탕 천사가 적을 공격. 1분 유지, V 재입력 시 해제', use(f) { if (f.cast && f.cast.type === 'paradise') { endParadise(f); return true; } startParadise(f); return 'nocd'; } },
+      c: { name: '수면', cd: 30, desc: '5초간 수면. 받는 피해 45% 감소, 체력 12% · 보호막 12% 회복', use(f) { startSleep(f); } },
+      v: { name: '설탕낙원', cd: 65, desc: '지형이 설탕 낙원으로 변하고 꽃 위에서 수면. 받는 피해 55% 감소, 체력 20% · 보호막 25% 회복. 설탕 천사가 적을 공격. 40초 유지, V 재입력 시 해제', use(f) { if (f.cast && f.cast.type === 'paradise') { endParadise(f); return true; } startParadise(f); return 'nocd'; } },
     }
   }
 };
@@ -670,7 +673,7 @@ function updLakes(dt) {
 /* ===== 이터널슈가: 수면 (C) ===== */
 function sleepFX(f, dt) { if (Math.random() < dt * 6) vfx.emit('heart', { x: f.root.position.x + rnd(-.5, .5), y: f.root.position.y + 2.2, z: f.root.position.z + rnd(-.5, .5), vy: 1.4, life: 1.4, s0: .45, s1: 0, c0: 0xffd0ee, c1: 0xff8ad0 }); }
 function startSleep(f) {
-  const dur = 5; f.cast = { type: 'sleep', t: 0, dur, hp: f.max * .2, sh: f.shieldMax * .2 }; f.drT = dur + .05; f.drV = .6; f.pose = 'sleep';
+  const dur = 5; f.cast = { type: 'sleep', t: 0, dur, hp: f.max * .12, sh: f.shieldMax * .12 }; f.drT = dur + .05; f.drV = .45; f.pose = 'sleep';
   vfx.ring(P3(f), { r0: .5, r1: 5, dur: .7, color: 0xffb3e6 }); vfx.burst('glow', P3(f, 1), 30, { speed: 2, speed2: 6, life: 1.2, size: .9, c0: 0xffffff, c1: 0xff8ad0, up: 2 });
   ui.pop(P3(f, 3.4), '💤 수면', '#ffb3e6'); setAnim(f, 'cast', .4);
 }
@@ -691,8 +694,8 @@ function startParadise(f) {
   const group = new THREE.Group(), cols = [0xffb3e6, 0xffffff, 0xff8ad0, 0xffd6f0];
   for (let i = 0; i < 46; i++) { const fl = buildFlower(rnd(.7, 1.5), cols[i % 4]); fl.position.set(rnd(-W * S / 2, W * S / 2), 0, rnd(-H * S / 2, H * S / 2)); fl.rotation.y = rnd(0, 6.283); fl.userData.ph = rnd(0, 6.283); group.add(fl); }
   const big = buildFlower(2.6, 0xff9ad8); big.position.copy(P3(f)); big.position.y = -.1; group.add(big); world.scene.add(group);
-  f.cast = { type: 'paradise', t: 0, dur: 60, group, big, angelT: 1.2, hp: f.max * .35, sh: f.shieldMax * .4 };
-  f.drT = 1e9; f.drV = .8; f.pose = 'sleep'; world.setParadise(true);
+  f.cast = { type: 'paradise', t: 0, dur: 40, group, big, angelT: 1.2, hp: f.max * .2, sh: f.shieldMax * .25 };
+  f.drT = 1e9; f.drV = .55; f.pose = 'sleep'; world.setParadise(true);
   const p = P3(f); for (let i = 0; i < 3; i++) vfx.ring(p, { r0: .5, r1: 10 + i * 8, dur: .7 + i * .25, color: i ? 0xffffff : 0xff9ad8 });
   vfx.burst('glow', P3(f, 1.5), 70, { speed: 4, speed2: 16, life: 1.2, life2: 2, size: 1, c0: 0xffffff, c1: 0xff8ad0, flat: true, drag: 1 });
   shake(.6, .5); ui.flash('#ffc2e6', .7, .6); toast(f, '설탕낙원 전개!');
@@ -736,7 +739,7 @@ function updAngels(dt) {
   B.angels = B.angels.filter(a => { if (a.life <= 0) { world.scene.remove(a.g); vfx.burst('glow', W3(a.x, a.y, 2.4), 14, { speed: 3, life: .6, size: .6, c0: 0xffffff, c1: 0xffb3e6 }); return false; } return true; });
 }
 CHARS.dark = {
-  id: 'dark', name: '어둠마녀 쿠키', color: 0xd8202f, cost: 600, hp: 24000, witch: { hp: 60000 }, pref: 5.5, atkRange: 520, tag: '유도 · 흡수 · 변신',
+  id: 'dark', name: '어둠마녀 쿠키', color: 0xd8202f, cost: 600, hp: 24000, witch: { hp: 60000 }, pref: 5.5, atkRange: 520, tag: '유도 · 흡수 · 변신 · 패시브: 보호막 흡수/관통', passive: '공격이 적중할 때마다 상대 보호막의 20%를 흡수해 내 보호막으로 삼고, 주는 피해의 10%는 상대 보호막을 관통해 체력에 들어갑니다.',
   skills: {
     base: {
       a: { name: '핏빛 구체', cd: .95, desc: '시뻘건 유도 마법구체를 발사. 범위 안에서만 유도. 데미지 120', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 500, r: 12, dmg: 120, color: 0xff2438, kind: 'orb', life: 1.2, homing: 340, turn: 3.6 }); } },
