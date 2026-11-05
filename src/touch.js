@@ -22,6 +22,9 @@ function css() {
   .tb .cdm{position:absolute;left:0;right:0;bottom:0;background:#000b}.tb .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;-webkit-text-stroke:4px #000;paint-order:stroke fill}
   .tb.ready{border-color:#fff;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),0 5px 0 #2b1830,0 0 14px #ffe48a}
   .tb.hold{transform:scale(.94)}
+  .tb.bound{filter:grayscale(.85) brightness(.75)}
+  .tb.bound::after{content:'⛓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;background:repeating-linear-gradient(135deg,#0000 0 7px,#cfd4ff66 7px 9px);text-shadow:0 0 4px #000,0 0 8px #000}
+  #tcz{position:absolute;inset:0;pointer-events:auto;touch-action:none}
   .tdot{position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid #2b1830;pointer-events:none;display:none;z-index:2}
   #tcam{position:absolute;right:14px;top:74px;width:46px;height:46px;font-size:22px}
   #trot{position:fixed;inset:0;z-index:9999;background:#2b1a5c;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;font:900 26px/1.3 'Jua','Noto Sans KR',sans-serif;text-align:center}
@@ -40,8 +43,17 @@ export function initTouch(a) {
   vp.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
   const rot = document.createElement('div'); rot.id = 'trot'; rot.innerHTML = '<b>📱</b>가로로 돌려서 플레이해 주세요'; document.body.appendChild(rot);
   root = document.createElement('div'); root.id = 'touch';
-  root.innerHTML = '<div id="tjoy"><div id="tbase"><div id="tknob"></div></div></div>';
+  root.innerHTML = '<div id="tcz"></div><div id="tjoy"><div id="tbase"><div id="tknob"></div></div></div>';
   document.body.appendChild(root);
+  // 카메라: 빈 화면을 한 손가락으로 끌면 회전/기울기, 두 손가락으로 벌리거나 오므리면 줌 (조이스틱·버튼은 이 위에 떠 있어서 영향 없음)
+  const cz = root.querySelector('#tcz'), ps = new Map(); let pinch = 0;
+  cz.addEventListener('pointerdown', e => { try { cz.setPointerCapture(e.pointerId); } catch (_) {} ps.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ps.size === 2) { const [a, b] = [...ps.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); } });
+  cz.addEventListener('pointermove', e => {
+    const p = ps.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (ps.size >= 2) { const [a, b] = [...ps.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch > 0 && d > 0) api.camZoom && api.camZoom(pinch / d); pinch = d; }
+    else api.camDrag && api.camDrag(dx, dy);
+  });
+  const czEnd = e => { ps.delete(e.pointerId); pinch = 0; }; cz.addEventListener('pointerup', czEnd); cz.addEventListener('pointercancel', czEnd);
   joy = root.querySelector('#tjoy'); base = root.querySelector('#tbase'); knob = root.querySelector('#tknob');
   let pid = null, ox = 0, oy = 0;
   const R = 58;
@@ -112,5 +124,6 @@ export function updateTouch() {
     else if (f.def.id === 'lich' && f.form === 'base' && k === 'v' && !f.awake && cd <= 0) t = '🔒';
     cdm.style.height = h + '%'; if (cdt.textContent !== t) cdt.textContent = t;
     b.el.classList.toggle('ready', cd <= 0 && (k !== 'r' || (f.awake && f.gauge >= 100)));
+    b.el.classList.toggle('bound', f.st.cdfreeze > 0 || f.st.silence > 0);
   }
 }

@@ -87,4 +87,10 @@
 - 사일런트솔트: HP 10000 이하 → `form='hour'`(침묵의 때: 데미지·범위 +30%, `skills.hour` 테이블). 궁극기 '신의 은포크 심판' = `startForkUlt/updForks/startSeal/updSeal/endSeal` (봉인수 내부: 망령 6 → 봉인수 처치 시 해제, 해제 후 `sealSoul`: 체력 -70%·데미지 -50%·쿨 +50%·패시브 소멸).
 - 리치: 궁극기 '드래곤의 심연' = `startLichUlt/updLult/startAbyss/updAbyss/endAbyss` (잡히면 30초 스턴, 탈출하면 `permRev/permSlow/mindOpen`). 심연도 봉인수처럼 별도 세계(realm 1, x+500)라 시전자는 본 맵에서 계속 플레이하고 **G키/버튼으로 심연 화면 전환**(`realmS()`/`viewRealm()`/`world.viewAbyss`). 기둥(`B.objs`)은 `realm` 태그로 세계별 충돌.
 - 두 궁극기 모두 듀얼/AI 대전에서만(레이드·탐험 제외). 유리 깨짐은 `ui.glass()/glassFall()` DOM 오버레이.
+- **자연 회복(전 캐릭터 공통)**: 공격/피격 없이 5초가 지나면 초당 최대체력 1.2% (`updCommon`, `f.cmb` = 마지막 전투 시각; 몹·미니언·레이드 보스·fx 상대 제외).
+- **버닝스파이스 쿠키** (`CHARS.burn`, 비스트, HP 32000, 보호막 없음): 평타 4연타 400(마지막 타 화상) / Z 거대화 10초(받피감 35%, 평타 1000) / X 도끼 투척 2000 → 맞으면 도약·내려찍기 2500+화상(`leapSlam`) / C 포효 1500 + 지형 파괴(`breakTerrain`, `world.breakProps`) + 향신료 군단 4기(`summonLegion`, 24초) / V 돌진 2000 → 컷신 5000(`dashV`, `startBurnCut/updBurnCut`). 패시브: 죽으면 10초 불사(`startUndy`), 그 안에 적을 처치하면 +1000 되살아남(`undyKill`). 화상 = `burnOn`/`f.burn`. 연속 동작 도우미 `act(f,dur,upd,end)`, 높이 `f.air`.
+- 버닝스파이스·세인트릴리 모델: `src/vcglb.js`(정점색 glb 공용 로더, `VC` 표에 id 추가). 원본 glb 는 UV 아틀라스가 조각나서 단순화하면 몸통이 검게 깨짐 → `scripts/_bake.html`(브라우저에서 텍스처를 정점색으로 굽고 클러스터링; `?g=격자수&src=경로`) + `scripts/_recv.cjs`(결과 수신, 포트 9911)로 `www/assets/models/<id>/<id>.glb` 생성. 원본 60MB 는 저장소에 넣지 않음(구울 때만 `www/_tmp/` 에 임시 복사 후 삭제).
+- 버닝스파이스 X 내려찍기는 도끼에 맞은 대상의 무적/아공간/퓨어바닐라 장막을 무시하고 무조건 적중.
+- **세인트릴리 쿠키** (`CHARS.lily`, HP 23000, 원거리): 평타 꽃 200 / Z 거대 줄기 3개(400×3, `stemFx`) / X 가시밭(1400 + 스턴 2초, `thornFx`) / C 백합(`buildLilyMesh`; 광역 3000 + 장막형 `B.barriers`(`b.lily`): 적 공격 차단·튕김, 안의 아군 공격력 버프 + 초당 2% 회복, 10초) / V 수호자의 힘(`guardianBoost`: 아군/자신의 장막·빛·호수·헥스·필드·봉인수가 있으면 강화(+8초, 효과↑), 없으면 유도탄 2000 + 쿨타임 정지·스킬 봉인 5초 + 상대 영역 파괴 `breakDomains`). 연출용 시간 메시는 `addFxm/updFxm`(`B.fxm`).
+- 쿨타임 정지(`cdfreeze`)/침묵 상태면 HUD 스킬 슬롯·터치 버튼에 사슬 모양(`.bound`). 모바일 카메라: `touch.js` 의 `#tcz` 영역(한 손가락 드래그 = 회전, 두 손가락 = 줌).
 - 각성(SAVE.awake) 해금 UI는 아직 없음 → 테스트는 `WB.SAVE.awake=['silent','lich']`.

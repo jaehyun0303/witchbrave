@@ -49,7 +49,7 @@ export function createWorld(canvas) {
   const sky = skyDome(0x050314, 0x241446, 0x0a0618, 0xcfd8ff); arena.add(sky);
   const ft = tex('floor'); ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(5, 3);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(72, 1.2, 41), new THREE.MeshStandardMaterial({ map: ft, roughness: .9, metalness: 0, color: 0x7a72b8 }));
-  const mapG = new THREE.Group(); arena.add(mapG); const bushList = [];
+  const mapG = new THREE.Group(); arena.add(mapG); const bushList = [], propList = [];
   let theme = MAPS[0];
   floor.position.y = -.6; floor.receiveShadow = true; arena.add(floor);
   const rim = new THREE.Mesh(new THREE.BoxGeometry(72.6, .14, 41.6), new THREE.MeshBasicMaterial({ color: 0x6a58ff }));
@@ -118,7 +118,13 @@ export function createWorld(canvas) {
     renderer, scene, camera, composer, bloom, arena, mind, crystals, moonL, hemi, resize, inMind: false, bushList,
     clearMap() {
       mapG.children.slice().forEach(c => { mapG.remove(c); c.traverse(o => o.geometry && o.geometry.dispose()); });
-      crystals.length = 0; bushList.length = 0;
+      crystals.length = 0; bushList.length = 0; propList.length = 0;
+    },
+    // 지형지물 파괴: 중심 (x,y 로직 좌표) 반경 R 안의 장식물을 지우고 부순 것들의 목록을 돌려준다
+    breakProps(cx, cy, R) {
+      const gone = [];
+      for (let i = propList.length - 1; i >= 0; i--) { const { p, g } = propList[i]; if (Math.hypot(p.x - cx, p.y - cy) < R + (p.r || 0)) { mapG.remove(g); propList.splice(i, 1); gone.push(p); } }
+      return gone;
     },
     // 맵 테마/크기 적용 + 지형지물·풀숲·장식 생성 (L = layoutMap 결과)
     setMap(map, L) {
@@ -131,7 +137,7 @@ export function createWorld(canvas) {
       if (sky.userData.stars) { sky.userData.stars.visible = !!st; if (st) sky.userData.stars.material.color.set(st); }
       scene.fog.color.set(map.fog[0]); scene.fog.density = map.fog[1]; hemi.color.set(map.hemi[0]); hemi.groundColor.set(map.hemi[1]); moonL.color.set(map.moon); bloom.strength = map.bloom;
       const W3 = (o, y = 0) => new THREE.Vector3((o.x - map.W / 2) * S, y, (o.y - map.H / 2) * S);
-      for (const p of L.props) { const g = buildProp(map, p); g.position.copy(W3(p)); mapG.add(g); if (g.userData.crystal) crystals.push(g.userData.crystal); }
+      for (const p of L.props) { const g = buildProp(map, p); g.position.copy(W3(p)); mapG.add(g); propList.push({ p, g }); if (g.userData.crystal) crystals.push(g.userData.crystal); }
       L.bushes.forEach((b, i) => { const g = buildBush(map, b, i + map.seed); g.position.copy(W3(b)); mapG.add(g); bushList.push(g); });
       mapG.add(buildDecor(map, L.decor, map.W, map.H));
     },

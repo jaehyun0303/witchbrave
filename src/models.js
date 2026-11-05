@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { tex } from './tex.js';
 import { lichReady, applyLich } from './lichglb.js';
 import { sugarReady, applySugar } from './sugarglb.js';
+import { vcReady, applyVC } from './vcglb.js';
 import { dragonReady, buildDragonGLB } from './dragonglb.js';
 import { darkReady, applyDark } from './darkglb.js';
 import { shadowReady, applyShadow } from './shadowglb.js';
@@ -113,6 +114,7 @@ export function buildCookie(def) {
   if (id === 'dark' && darkReady()) applyDark(rig);
   if (id === 'shadow' && shadowReady()) applyShadow(rig);
   if ((id === 'pv' || id === 'silent') && fbxReady(id)) applyFbx(id, rig);
+  if ((id === 'burn' || id === 'lily') && vcReady(id)) applyVC(id, rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }
