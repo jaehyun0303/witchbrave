@@ -29,7 +29,10 @@ const realmOf = o => o.realm || 0;
 
 let SAVE = { coins: 0, unlocked: ['silent'], awake: [], wins: {} };
 try { const s = JSON.parse(localStorage.getItem('wb3d_save')); if (s && s.unlocked) SAVE = Object.assign(SAVE, s); } catch (e) {}
+SAVE.mat = SAVE.mat || 0; SAVE.awakeOn = SAVE.awakeOn || {};   // 각성 재료 / 캐릭터별 각성 형태 사용 여부
 const persist = () => { try { localStorage.setItem('wb3d_save', JSON.stringify(SAVE)); } catch (e) {} };
+const AWAKE_COST = 10;   // 캐릭터 한 명을 각성시키는 데 필요한 각성 재료
+const formOf = id => { const d = CHARS[id]; return d && d.awakeId && SAVE.awake.includes(id) && SAVE.awakeOn[id] ? d.awakeId : id; };
 
 let B = null, world, vfx, camera, canvas;
 const foe = f => { let best = null, bd = 1e18; for (const o of B.fighters) { if (o === f || o.hp <= 0 || o.nofoe || ally(o, f) || realmOf(o) !== realmOf(f)) continue; const d = (o.x - f.x) ** 2 + (o.y - f.y) ** 2; if (d < bd) { bd = d; best = o; } } return best || B.fighters.find(o => o !== f && realmOf(o) === realmOf(f)) || B.ghost; };
@@ -45,6 +48,10 @@ function hurt(src, t, n, o = {}) {
   if (t.hp <= 0 || t.st.inv > 0 || t.undy > 0) return;
   if (src && src !== t && ally(src, t)) return;
   if (src && src !== t && realmOf(src) !== realmOf(t)) return;
+  if (src && src !== t && !o.refl && B.barriers.length) {   // 각성 퓨어바닐라의 반사막: 막는 대신 그대로 되돌려 보낸다
+    const rb = B.barriers.find(b => b.refl && b.owner !== src && !ally(b.owner, src) && (b.owner === t || ally(b.owner, t)) && Math.hypot(t.x - b.x, t.y - b.y) < b.r);
+    if (rb) { if (!o.quiet) ui.pop(P3(t, 2.6), '↩ 반사!', '#fff3b0'); hurt(t, src, n, { refl: true, quiet: o.quiet, field: o.field }); return; }
+  }
   if (src && src !== t && B.barriers.length && inBarrier(src, t)) { if (!o.quiet) ui.pop(P3(t, 2.6), '막힘!', '#fff3b0'); return; }
   let d = n * (src ? dmgMul(src) : 1) * (1 - defRed(t));
   if (t.drT > 0) d *= 1 - t.drV;
@@ -54,6 +61,10 @@ function hurt(src, t, n, o = {}) {
   let hpD = d; if (t.shield > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; hpD = d - ab; }
   t.hp = Math.max(0, t.hp - hpD - pierce); t.flash = .12; d += pierce; t.cmb = B.time; if (src && src !== t) src.cmb = B.time;
   if (B.raid && t === B.raid.boss && src === B.fighters[0]) B.raid.dmg += d;
+  if (src && src !== t && !o.refl15 && !o.refl) {   // 빛의 아공간: 안에서 공격한 적은 준 피해의 15%를 되돌려 받는다
+    const lp = B.fighters.find(p => p.ldom && p.hp > 0 && p !== src && !ally(p, src) && realmOf(p) === realmOf(src) && Math.hypot(src.x - p.ldom.x, src.y - p.ldom.y) < p.ldom.r);
+    if (lp && d > 0) hurt(lp, src, d * .15, { refl15: true, quiet: o.quiet, field: true });
+  }
   if (src && src !== t && src.def.ult && !src.hidden) src.gauge = Math.min(100, src.gauge + n / (src.def.ult.need / 100));
   const big = d >= 800;
   if (!o.quiet) {
@@ -251,6 +262,7 @@ function updField(f, dt) {
 function startMind(f) {
   if (B.seal || B.abyss || B.lult) return false;
   const e = foe(f);
+  if (e !== B.ghost && immune(e) && (e.def.id === 'pva' || inLdom(e))) { ui.pop(P3(e, 3.4), '저항!', '#fff0a8'); toast(f, '각성 퓨어바닐라 쿠키와 빛의 아공간 안의 아군에게는 정신계 공격이 통하지 않습니다'); return false; }
   if (inBarrier(f, e)) { ui.pop(P3(e, 3.4), '장막이 막았다!', '#fff3b0'); return false; }
   B.barriers.forEach(removeBarrier); B.barriers = [];
   B.mind = { t: 15, f, ret: B.fighters.map(o => ({ x: o.x, y: o.y })), objs: B.objs };
@@ -316,6 +328,7 @@ function startCut(f, name, onHit, opt = {}) {
 function updateCut(dt) {
   if (B.cut.kind === 'dm') return updDarkMoon(dt);
   if (B.cut.kind === 'burn') return updBurnCut(dt);
+  if (B.cut.kind === 'moonk') return updMoonK(dt);
   const c = B.cut, f = c.f, e = c.e, t = c.t += dt, fl = c.fl;
   if (c.dark) { const u = sstep(0, 4.4, t), col = new THREE.Color(0xfff6dc).lerp(new THREE.Color(0x03030a), u), capc = new THREE.Color(0xfff0b0).lerp(new THREE.Color(0x000000), u); c.moon.halves.forEach(h => { h.children[0].material.color.copy(col); h.children[1].material.color.copy(capc); }); c.moon.glow.material.color.set(u > .5 ? 0x4a5cff : 0xcfd8ff); }
   const base = W3(c.home.x, c.home.y, 0), M = c.moon.group.position;
@@ -547,7 +560,8 @@ CHARS.shadow = {
 
 /* ===== 쉐도우밀크 ===== */
 const SHB = 0x3a7bff;
-const immune = t => !t.mindOpen && (t.def.id === 'silent' || t.form === 'dragon' || !!t.def.spirit);
+const inLdom = t => !!B && B.fighters.some(p => p.ldom && p.hp > 0 && realmOf(p) === realmOf(t) && (t === p || ally(p, t)) && Math.hypot(t.x - p.ldom.x, t.y - p.ldom.y) < p.ldom.r + t.r);
+const immune = t => t.def.id === 'pva' || inLdom(t) || (!t.mindOpen && (t.def.id === 'silent' || t.form === 'dragon' || !!t.def.spirit));
 const pwr = f => f.soul ? .25 : 1;
 function buildEye(sc) {
   const g = new THREE.Group();
@@ -906,6 +920,10 @@ function startBarrier(f) {
 function removeBarrier(b) { if (b.mesh && b.t < b.dur - .1) world.scene.remove(b.mesh); if (b.dome) b.dome.closing = true; [b.rune, b.ring].forEach(i => i && vfx.remove(i)); }
 function updBarriers(dt) {
   for (const b of B.barriers) {
+    if (b.follow) {   // 주인을 따라다니는 장막
+      b.x = b.owner.x; b.y = b.owner.y; const p2 = P3(b);
+      for (const it of [b.dome, b.rune, b.ring]) if (it && it.obj) { it.obj.position.x = p2.x; it.obj.position.z = p2.z; }
+    }
     b.t += dt; b.acc += dt; const p = P3(b), R = b.r * S;
     if (Math.random() < .7) { const a = rnd(0, 6.283); vfx.emit('glow', { x: p.x + Math.cos(a) * R, y: .2, z: p.z + Math.sin(a) * R, vy: rnd(2, 6), life: .9, s0: .5, s1: 0, c0: 0xffffff, c1: PVC, a: .8, drag: 0 }); }
     for (const t of B.fighters) {
@@ -913,7 +931,8 @@ function updBarriers(dt) {
       const d = Math.hypot(t.x - b.x, t.y - b.y), mine = t === b.owner || ally(b.owner, t);
       if (mine) {
         if (d < b.r + t.r) {
-          const hl = (b.lily ? t.max * .02 : 100) * (b.boost ? 2 : 1); t.hp = Math.min(t.max, t.hp + hl * dt); t.barAcc = (t.barAcc || 0) + hl * dt;
+          if (b.refl) { const cap = Math.max(t.shieldMax, 2000); t.shieldMax = cap; t.shield = Math.min(cap, t.shield + 800 * dt); }   // 반사막 안: 보호막 재충전
+          const hl = (b.refl ? t.max * .03 : b.lily ? t.max * .02 : 100) * (b.boost ? 2 : 1); t.hp = Math.min(t.max, t.hp + hl * dt); t.barAcc = (t.barAcc || 0) + hl * dt;
           if (t.barAcc >= Math.max(100, hl * .7)) { ui.pop(P3(t, 2.8), '+' + Math.round(t.barAcc), '#7dff9b'); t.barAcc = 0; }
           if (b.lily) { if (t.st.lightBuff <= 0) ui.pop(P3(t, 3.2), '⚔ 공격력 UP', '#ffd0f0'); t.st.lightBuff = .4; }   // 백합 안: 세인트릴리와 아군 공격력 버프 + 힐
         }
@@ -924,7 +943,8 @@ function updBarriers(dt) {
       }
     }
     for (const q of B.projs) if (q.owner !== b.owner && !ally(q.owner, b.owner) && Math.hypot(q.x - b.x, q.y - b.y) < b.r + q.r) {
-      vfx.burst('spark', W3(q.x, q.y, 1.2), 12, { speed: 5, life: .35, size: .4, c0: 0xffffff, c1: PVC }); vfx.flash(W3(q.x, q.y, 1.2), { color: PVC, size: 2.4, dur: .2 }); killProj(q);
+      vfx.burst('spark', W3(q.x, q.y, 1.2), 12, { speed: 5, life: .35, size: .4, c0: 0xffffff, c1: PVC }); vfx.flash(W3(q.x, q.y, 1.2), { color: PVC, size: 2.4, dur: .2 });
+      if (b.refl) { q.owner = b.owner; q.vx = -q.vx; q.vy = -q.vy; q.hit = new Set(); q.life = Math.max(q.life, .8); q.realm = b.owner.realm; } else killProj(q);   // 반사막: 투사체를 되돌려 보낸다
     }
     if (b.dome && b.t > b.dur - .5) b.dome.closing = true;
   }
@@ -1293,6 +1313,7 @@ function updChain(dt) {
 
 /* ===== 봉인수 내부 ===== */
 function clearStates(t) {
+  if (t.ldom) endLdom(t);   // 봉인되면 빛의 아공간도 풀린다
   if (t.cast) { if (t.cast.type === 'field') endField(t); else if (t.cast.type === 'paradise') endParadise(t); else { if (t.cast.type === 'control') { const e = foe(t); e.st.ctl = 0; e.ctlBy = null; } t.cast = null; } }
   if (t.drain) endDrain(t); if (t.veil) endVeil(t); t.pose = null; t.drT = 0; t.hidden = false; t.script = null; t.st.ctl = 0; t.ctlBy = null;
 }
@@ -1479,6 +1500,7 @@ function burnOn(t, src, dur = 4, dps = 300) {   // 화상: 0.5초마다 도트 �
 function act(f, dur, upd, end) { f.script = { t: 0, steps: [], end: dur, onEnd: () => { if (f.act) f.act.upd(1, 0); f.act = null; end && end(); } }; f.act = { t: 0, dur, upd }; }
 function updCommon(f, dt) {   // 전 캐릭터 공통: 화상, 불사, 거대화, 수명, 자연 회복
   if (f.hp <= 0) { f.burn = null; return; }
+  if (f.def.id === 'pva') { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) f.st[k] = 0; f.burn = null; f.mindBuff = false; }   // 각성 퓨어바닐라: 디버프 면역
   if (f.undy > 0) {
     f.undy -= dt; const p = P3(f, 1.2);
     if (Math.random() < .7) vfx.emit('glow', { x: p.x + rnd(-.7, .7), y: rnd(.2, 2.6), z: p.z + rnd(-.7, .7), vy: rnd(2, 6), life: .6, s0: .6, s1: 0, c0: 0xffd070, c1: 0xff3a00, drag: 0 });
@@ -1547,7 +1569,7 @@ function leapSlam(f, t) {   // 도끼가 맞으면: 하늘로 뛰어올라 떨�
         if (t.cast && t.cast.type === 'sub') { t.cast = null; t.st.stun = Math.max(t.st.stun, .8); ui.pop(P3(t, 3.6), '아공간 파괴!', '#ffb050', true); }
         t.hidden = false; t.st.inv = 0; t.bushHid = false;
       }
-      const brs = B.barriers.filter(b => (b.owner === t || ally(b.owner, t)) && Math.hypot(t.x - b.x, t.y - b.y) < b.r + 200);   // 퓨어바닐라 장막: 내려찍는 순간 장막을 부순다
+      const brs = B.barriers.filter(b => !b.noBreak && (b.owner === t || ally(b.owner, t)) && Math.hypot(t.x - b.x, t.y - b.y) < b.r + 200);   // 퓨어바닐라 장막: 내려찍는 순간 장막을 부순다
       if (brs.length) { brs.forEach(removeBarrier); B.barriers = B.barriers.filter(b => !brs.includes(b)); ui.pop(P3(t, 4.2), '장막 파괴!', '#ffb050', true); }
       shock(f, 200, BRN, 2500, tt => burnOn(tt, f, 5, 350));
       const c = P3(f); vfx.column(c, { r: 2.6, h: 28, dur: .7, color: 0xff6a1a, alpha: .8 }); vfx.burst('spark', P3(f, .6), 60, { speed: 8, speed2: 24, life: .8, size: .7, c0: 0xffffff, c1: BRN, grav: 6 }); vfx.ring(c, { r0: .5, r1: 14, dur: .6, color: 0xffd070 });
@@ -1755,6 +1777,153 @@ CHARS.lily = {
     }
   }
 };
+/* ===== 각성 퓨어바닐라 쿠키 (HP 27000, 기본 보호막 2000, 디버프·정신계 면역) ===== */
+const PVA = 0xfff2b0, PVB = 0x2a4bff;
+function buildGoldEye(sc) {
+  const g = new THREE.Group();
+  const w = new THREE.Mesh(new THREE.SphereGeometry(.5, 16, 12), new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xffd45c, emissiveIntensity: .8 })); w.scale.set(1.5, .8, .4); g.add(w);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffb020 })); iris.position.z = .15; iris.scale.set(1, 1, .5); g.add(iris);
+  const pup = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0x4a2a00 })); pup.scale.set(.4, 1.7, .5); pup.position.z = .25; g.add(pup);
+  g.scale.setScalar(sc); g.userData.sc = sc; return g;
+}
+function startLdom(f) {   // Z: 빛의 아공간
+  if (f.ldom) { toast(f, '이미 빛의 아공간이 전개되어 있습니다'); return false; }
+  setAnim(f, 'cast', .8); let broke = 0;
+  for (const o of B.fighters) if (o !== f && !ally(f, o) && realmOf(o) === realmOf(f)) {   // 쉐도우밀크의 아공간(숨기·장막·심연의 손길)을 파괴
+    if (o.cast && o.cast.type === 'sub') { o.cast = null; o.hidden = false; o.st.inv = 0; o.st.stun = Math.max(o.st.stun, .8); broke++; }
+    if (o.veil) { endVeil(o); broke++; }
+  }
+  const hs = B.hexes.filter(h => h.owner !== f && !ally(f, h.owner)); hs.forEach(removeHex); B.hexes = B.hexes.filter(h => !hs.includes(h)); broke += hs.length;
+  const d = f.ldom = { x: f.x, y: f.y, r: 1000, t: 0, eyes: [] }, p = P3(d), R = d.r * S;
+  d.rune = vfx.decal(p, { tex: 'rune', r: R, color: PVA, alpha: .8, spin: .15 }); d.rune2 = vfx.decal(p, { tex: 'rune', r: R * .62, color: 0xffffff, alpha: .55, spin: -.3, y: .06 }); d.ring = vfx.decal(p, { tex: 'ring', r: R, color: 0xffffff, alpha: .95, y: .07 });
+  for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283 + rnd(-.2, .2), rr = R * rnd(.3, .95), e = buildGoldEye(rnd(2.5, 4.5)); e.position.set(p.x + Math.cos(a) * rr, rnd(5, 16), p.z + Math.sin(a) * rr); e.userData.o = i * .06; e.userData.ph = rnd(0, 6.283); e.scale.setScalar(.001); world.scene.add(e); d.eyes.push(e); }
+  vfx.ring(p, { r0: 1, r1: R, dur: 1.1, color: PVA }); vfx.ring(p, { r0: 1, r1: R * .7, dur: 1.4, color: 0xffffff, alpha: .7 }); vfx.column(p, { r: 3, h: 50, dur: 1, color: PVA, alpha: .7 });
+  ui.flash('#fff6c0', .8, .55); shake(.8, .5); ui.pop(P3(f, 4.4), broke ? '☀ 아공간 파괴 · 빛의 아공간!' : '☀ 빛의 아공간!', '#fff0a8', true);
+  toast(f, '빛의 아공간: 아군 정신계·디버프 면역 / 적 이동기 봉인 / 적이 준 피해의 15% 반사');
+}
+function endLdom(f, quiet) {
+  const d = f.ldom; if (!d) return; f.ldom = null;
+  [d.rune, d.rune2, d.ring].forEach(i => vfx.remove(i)); d.eyes.forEach(e => world.scene.remove(e));
+  if (!quiet && B) { vfx.ring(P3(d), { r0: 1, r1: d.r * S * .6, dur: .8, color: PVA }); ui.pop(P3(f, 4.2), '빛의 아공간 해제', '#fff0a8'); }
+}
+function updLdoms(dt) {
+  for (const f of B.fighters) {
+    const d = f.ldom; if (!d) continue;
+    if (f.hp <= 0) { endLdom(f); continue; }
+    d.t += dt; const p = P3(d), R = d.r * S;
+    for (const e of d.eyes) { const k = ease.out(sstep(e.userData.o, e.userData.o + .5, d.t)), bl = Math.abs(Math.sin(d.t * 1.4 + e.userData.ph)) > .93 ? .15 : 1, sc = e.userData.sc; e.scale.set(sc * k, sc * k * bl, sc * k); e.lookAt(camera.position); }
+    if (Math.random() < .6) { const a = rnd(0, 6.283), rr = Math.sqrt(Math.random()) * R; vfx.emit('glow', { x: p.x + Math.cos(a) * rr, y: rnd(.2, 3), z: p.z + Math.sin(a) * rr, vy: rnd(2, 6), life: 1.4, s0: .5, s1: 0, c0: 0xffffff, c1: PVA, a: .7, drag: 0 }); }
+    for (const o of B.fighters) {
+      if (o.hp <= 0 || realmOf(o) !== realmOf(f)) continue;
+      const inside = Math.hypot(o.x - d.x, o.y - d.y) < d.r + o.r;
+      if (o === f || ally(f, o)) { if (inside) { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) o.st[k] = 0; o.burn = null; } continue; }
+      if (inside && (o.script || (o.cast && o.cast.type === 'sub')) && o._lx !== undefined) {   // 이동기(돌진·아공간 이동 등)는 일반 이동 속도로만 움직일 수 있다
+        const dd = Math.hypot(o.x - o._lx, o.y - o._ly), lim = 150 * 1.6 * dt + 2;
+        if (dd > lim) { const k = lim / dd; o.x = o._lx + (o.x - o._lx) * k; o.y = o._ly + (o.y - o._ly) * k; if (o._blk === undefined || B.time - o._blk > .9) { o._blk = B.time; ui.pop(P3(o, 3.4), '🚫 이동기 봉인', '#fff0a8'); } }
+      }
+      o._lx = o.x; o._ly = o.y;
+    }
+  }
+}
+function lightWave(f) {   // X: 광범위한 빛의 파동 — 정신계 해제 + 적 변신 해제
+  setAnim(f, 'cast', .6); const R = 750, p = P3(f); let n = 0;
+  vfx.ring(p, { r0: 1, r1: R * S, dur: .9, color: PVA }); vfx.ring(p, { r0: 1, r1: R * S * .7, dur: 1.1, color: 0xffffff, alpha: .7 }); vfx.burst('glow', P3(f, 1.2), 70, { speed: 6, speed2: 22, life: 1, size: 1.1, c0: 0xffffff, c1: PVA, flat: true });
+  ui.flash('#fff6c0', .5, .45); shake(.7, .4);
+  for (const o of B.fighters) if (realmOf(o) === realmOf(f) && o.hp > 0 && Math.hypot(o.x - f.x, o.y - f.y) < R + o.r) {
+    if (o === f || ally(f, o)) { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) o.st[k] = 0; continue; }
+    hurt(f, o, 800);
+    if (o.form === 'dragon' || o.form === 'witch') { revertForm(o); ui.pop(P3(o, 4), '✨ 변신 해제!', '#fff0a8', true); n++; }
+  }
+  if (B.mind && B.mind.f !== f && !ally(f, B.mind.f)) { endMind(); ui.pop(P3(f, 4.2), '✨ 정신세계 해제!', '#ff9ae6', true); }
+  ui.pop(P3(f, 3.4), n ? '빛의 파동 · 변신 해제' : '빛의 파동', '#fff0a8');
+}
+function buildKMoon(R) {   // 지식의 달: 앞면(+z) 노랑, 뒷면 진한 파랑
+  const g = new THREE.Group(), geo = new THREE.SphereGeometry(R, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+  const front = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffe680 })); front.rotation.x = Math.PI / 2;
+  const back = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x08155e })); back.rotation.x = -Math.PI / 2;
+  const sp = c => new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const gF = sp(0xffe27a), gB = sp(0x2a4bff); gF.scale.setScalar(R * 4.4); gB.scale.setScalar(R * 4.4); g.add(front, back, gF, gB); gB.material.opacity = 0;
+  return { group: g, front, back, gF, gB, R };
+}
+function startMoonK(f) {   // V: 지식의 달
+  const e = foe(f); if (!e || e === B.ghost || e.hp <= 0) { toast(f, '대상이 없습니다'); return false; }
+  const moon = buildKMoon(18); moon.group.position.set(0, 36, -72); world.scene.add(moon.group);
+  B.projs.forEach(killProj); B.projs = [];
+  B.cut = { kind: 'moonk', t: 0, dur: 13.2, f, e, moon, fl: {}, hits: 0, strips: [], home: { x: f.x, y: f.y } };
+  world.setCut(true); ui.cinema(true); f.pose = 'raise'; camera.near = .1; ui.title(f.def.name, 'MOON OF KNOWLEDGE');
+}
+function updMoonK(dt) {
+  const c = B.cut, f = c.f, e = c.e, t = c.t += dt, fl = c.fl, M = c.moon.group.position, base = W3(c.home.x, c.home.y, 0), eb = P3(e, 0), V3 = THREE.Vector3;
+  f.root.position.set(base.x, f.air || 0, base.z);
+  const ry = c.moon.group.rotation.y; c.moon.gF.material.opacity = Math.max(0, Math.cos(ry)) * .85; c.moon.gB.material.opacity = Math.max(0, -Math.cos(ry)) * .95;
+  const beam = (a, b) => { if (c.bt === undefined || t - c.bt > .09) { c.bt = t; vfx.line('glow', M.clone().add(new V3(rnd(-9, 9), rnd(-9, 9), 8)), P3(f, 1.7), 8, { size: .8, size1: .1, c0: a, c1: b, life: .8, rad: .45, v: 1 }); } };
+  let pos, look, fov;
+  if (t < 1.8) {                      // ① 두 손을 들어 올린다
+    const u = t / 1.8; f.pose = 'raise';
+    pos = new V3(base.x + lerp(3.4, 1.6, ease.io(u)), lerp(1.4, 2, u), base.z + lerp(8.5, 6, u)); look = base.clone().add(new V3(0, lerp(1.6, 2.4, u), 0)); fov = lerp(40, 34, u);
+  } else if (t < 4.4) {               // ② 달의 앞면: 노란 빛
+    const u = (t - 1.8) / 2.6, k = ease.io(u); beam(0xfff2a0, 0xffc933);
+    if (!fl.a) { fl.a = 1; ui.flash('#ffe680', .6, .4); ui.title('', ''); }
+    pos = new V3(lerp(base.x + 1.6, 0, k), lerp(2, 9, k), lerp(base.z + 6, 22, k)); look = base.clone().add(new V3(0, 2.4, 0)).lerp(M, ease.io(sstep(.1, 1, u))); fov = lerp(34, 52, u);
+  } else if (t < 7.0) {               // ③ 달이 돌아 뒷면: 진한 파란 빛
+    const u = (t - 4.4) / 2.6; c.moon.group.rotation.y = Math.PI * ease.io(u);
+    if (u < .5) beam(0xfff2a0, 0xffc933); else beam(0x6a8aff, 0x1a2a9a);
+    if (u > .5 && !fl.b) { fl.b = 1; ui.flash('#2a4bff', .6, .4); }
+    pos = new V3(0, lerp(9, 10, u), lerp(22, 24, u)); look = M.clone().add(new V3(0, -1, 0)); fov = 54;
+    B.shake = Math.max(B.shake, .1); B.shakeT = .2;
+  } else if (t < 8.4) {               // ④ 노랑 + 파랑의 힘이 퓨어바닐라에게로
+    const u = (t - 7.0) / 1.4; f.pose = 'raise'; f.air = 3 * ease.out(u); beam(0xfff2a0, 0x2a4bff);
+    if (!fl.c) { fl.c = 1; ui.flash('#ffffff', .8, .5); vfx.column(P3(f), { r: 2.6, h: 40, dur: 1.4, color: 0xffe680, alpha: .8 }); vfx.column(P3(f), { r: 1.6, h: 40, dur: 1.4, color: PVB, alpha: .8 }); for (let i = 0; i < 4; i++) vfx.ring(P3(f), { r0: 1, r1: 12 + i * 7, dur: .7 + i * .2, color: i % 2 ? 0xfff2b0 : 0x4a6bff }); shake(1, .6); }
+    for (let i = 0; i < 3; i++) { const a = rnd(0, 6.283), d = rnd(3, 7); vfx.emit('glow', { x: base.x + Math.cos(a) * d, y: rnd(0, 6), z: base.z + Math.sin(a) * d, vx: -Math.cos(a) * 6, vy: rnd(0, 3), vz: -Math.sin(a) * 6, life: .5, s0: .4, s1: .05, a: .7, c0: i % 2 ? 0xfff2a0 : 0x4a6bff, c1: 0xffffff, drag: 0 }); }
+    pos = new V3(base.x + lerp(-4, 3.2, u), lerp(2.2, 4, u), base.z + lerp(7, 9, u)); look = base.clone().add(new V3(0, 2.8 + f.air, 0)); fov = 40;
+  } else if (t < 9.6) {               // ⑤ 하늘에 거대한 빛의 장막
+    const u = (t - 8.4) / 1.2; f.air = lerp(3, 6, ease.out(u));
+    if (!fl.s) {
+      fl.s = 1; const sm = new THREE.MeshBasicMaterial({ map: tex('glow'), color: 0xfff0b0, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, st = new THREE.Mesh(new THREE.PlaneGeometry(10, 48), sm.clone()); st.position.set(eb.x + Math.cos(a) * 22, 26, eb.z + Math.sin(a) * 22); st.lookAt(eb.x, 26, eb.z); st.userData.a = a; addExtra(st); c.strips.push(st); }
+      ui.pop(P3(f, 5.4), '🌙 빛의 장막', '#fff0a8', true); shake(.8, .6);
+    }
+    c.strips.forEach((s, i) => { s.material.opacity = .6 * ease.out(u) * (.85 + Math.sin(t * 3 + i) * .15); });
+    pos = new V3(base.x + 1, 2, base.z + 10); look = eb.clone().add(new V3(0, lerp(10, 28, u), 0)); fov = lerp(46, 62, u);
+  } else if (t < 12.0) {              // ⑥ 많은 빛이 쏟아진다 (500 × 14 = 7000)
+    const u = (t - 9.6) / 2.4, n = Math.min(14, Math.floor((t - 9.6) / .16) + 1);
+    while (c.hits < n) {
+      c.hits++; const ec = P3(e, 0); vfx.column(ec.clone().add(new V3(rnd(-1.5, 1.5), 0, rnd(-1.5, 1.5))), { r: 1.6, h: 60, dur: .4, color: c.hits % 2 ? 0xfff2b0 : 0x6a8aff, alpha: .9 });
+      vfx.ring(ec, { r0: .5, r1: 6, dur: .35, color: PVA }); vfx.burst('spark', ec.clone().setY(1), 16, { speed: 6, speed2: 16, life: .5, size: .5, c0: 0xffffff, c1: PVA, grav: 5 });
+      hurt(f, e, 500, { quiet: true }); ui.pop(P3(e, 2.4 + rnd(0, 1.4)), '500', '#fff0a8', c.hits % 5 === 0); if (c.hits % 3 === 0) { shake(.6, .2); ui.flash('#fff6c0', .25, .15); }
+    }
+    if (Math.random() < .9) vfx.column(eb.clone().add(new V3(rnd(-9, 9), 0, rnd(-9, 9))), { r: rnd(.5, 1.2), h: 60, dur: .35, color: Math.random() < .5 ? 0xfff2b0 : 0x6a8aff, alpha: .8 });
+    c.strips.forEach((s, i) => { s.material.opacity = .6 * (.85 + Math.sin(t * 5 + i) * .15) * (1 - sstep(11.2, 12, t)); });
+    const mid = base.clone().lerp(eb, .35);
+    pos = mid.clone().add(new V3(lerp(-7, 7, u), lerp(10, 13, u), 15)); look = eb.clone().add(new V3(0, 2, 0)); fov = 46;
+  } else {                            // ⑦ 게임 화면 복귀
+    const u = Math.min(1, (t - 12.0) / 1.2), g = gameCamPose();
+    if (!fl.e) { fl.e = 1; c.strips.forEach(s => world.scene.remove(s)); c.strips = []; world.scene.remove(c.moon.group); world.setCut(false); ui.cinema(false); ui.title('', ''); f.pose = null; f.air = 0; }
+    f.air = 0;
+    pos = camState.pos.clone().lerp(g.pos, ease.io(u)); look = camState.look.clone().lerp(g.look, ease.io(u)); fov = lerp(camState.fov, g.fov, ease.io(u));
+    if (t >= c.dur) { B.cut = null; f.pose = null; camState.pos.copy(pos); camState.look.copy(look); camState.fov = fov; return; }
+  }
+  camState.pos.copy(pos); camState.look.copy(look); camState.fov = fov;
+}
+CHARS.pva = {
+  id: 'pva', base: 'pv', name: '각성 퓨어바닐라 쿠키', color: PVA, fx: 0xfff6c8, cost: 0, hp: 27000, shield: 2000, pref: 5.5, atkRange: 560, aiPref: 380, tag: '각성 · 빛의 아공간 · 반사막 · 지식의 달',
+  passive: '디버프와 정신계 공격을 받지 않습니다. (은포크에 봉인되면 빛의 아공간이 풀립니다)',
+  skills: {
+    base: {
+      a: { name: '굽이치는 빛', cd: .8, desc: '곡선을 그리며 날아가 적을 쫓는 유도탄 빛을 발사. 데미지 250', use(f) { setAnim(f, 'cast', .22); f.curve = -(f.curve || 1); shoot(f, { a: f.face + f.curve * .9, sp: 600, r: 13, dmg: 250, color: PVA, kind: 'orb', life: 1.6, homing: 1400, turn: 2.8 }); } },
+      z: { name: '빛의 아공간', cd: 50, desc: '빛의 눈이 가득한 아공간 전개. 쉐도우밀크의 아공간은 파괴. 안의 아군은 정신계·디버프 면역, 적의 이동기 봉인, 적이 준 피해의 15%가 되돌아감. 봉인되지 않는 한 유지', use(f) { return startLdom(f); } },
+      x: { name: '빛의 파동', cd: 20, desc: '주위로 광범위한 빛의 파동. 정신계 공격 해제, 적의 변신(드래곤·마녀 등) 해제, 적에게 800', use(f) { lightWave(f); } },
+      c: { name: '수호의 반사막', cd: 40, desc: '엄청 큰 보호막이 따라다님(12초). 안의 아군은 보호막 재충전 + 초당 3% 회복. 모든 공격 반사, 버닝스파이스도 못 부숨, 적을 튕겨냄', use(f) {
+        setAnim(f, 'cast', .6); const R = 520, b = { owner: f, x: f.x, y: f.y, r: R, t: 0, dur: 12, acc: 0, push: 0, refl: true, noBreak: true, follow: true, col: PVA }, p = P3(f), RS = R * S;
+        b.dome = vfx.dome(p, RS, PVA); b.rune = vfx.decal(p, { tex: 'rune', r: RS, color: PVA, alpha: .8, spin: .5 }); b.ring = vfx.decal(p, { tex: 'ring', r: RS, color: 0xffffff, alpha: .9, y: .07 });
+        vfx.ring(p, { r0: .5, r1: RS * 1.3, dur: .7, color: PVA }); vfx.burst('glow', P3(f, .6), 50, { speed: 3, speed2: 12, life: 1, size: 1, c0: 0xffffff, c1: PVA, flat: true });
+        ui.flash('#fff6c0', .4, .35); B.barriers.push(b); toast(f, '수호의 반사막!');
+      } },
+      v: { name: '지식의 달', cd: 60, desc: '[컷신] 달의 앞면은 노란 빛, 뒷면은 진한 파란 빛. 두 힘을 받아 하늘에 거대한 빛의 장막을 펼치고 수많은 빛을 쏟아부음. 7000', use(f) { return startMoonK(f); } },
+    }
+  }
+};
+CHARS.pv.awakeId = 'pva';
 const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv', 'burn', 'lily'];
 
 /* ===== 리치드래곤 변신 ===== */
@@ -1940,6 +2109,7 @@ function aiInput(f) {
     if (k === 'v' && f.def.id === 'silent' && d > 250) continue;
     if (f.def.id === 'burn' && ((k === 'v' && (d > 820 || d < 160)) || (k === 'x' && (d > 800 || d < 140)) || (k === 'z' && d > 420))) continue;
     if (f.def.id === 'burn' && f.undy > 0 && k === 'z') continue;
+    if (f.def.id === 'pva' && ((k === 'z' && f.ldom) || (k === 'c' && d > 700) || (k === 'x' && d > 800) || (k === 'v' && d > 1200))) continue;
     if (f.def.id === 'pv' && k === 'c' && !(f.st.lock > 0 || f.st.ctl > 0 || f.st.silence > 0 || B.mind || foe(f).veil || (foe(f).cast && foe(f).cast.type))) continue;
     if (k === 'v' && f.form !== 'base' && f.form !== 'hour') continue;
     if (k === 'v' && f.cast) continue;
@@ -2062,7 +2232,7 @@ function update(dt) {
   updBush();
   for (const m of B.fighters) if (m.legion && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
   if (B.fighters.some(m => m.gone && m.legion)) { B.fighters.filter(m => m.gone && m.legion).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && m.legion)); }
-  updFxm(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
+  updFxm(dt); updLdoms(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   if (B.explore) { updExplore(dt); return; }
@@ -2079,13 +2249,13 @@ function finish() {
       const bb = B, a = bb.fighters[0].def.id, b = bb.fighters[1].def.id, mid = bb.map.id;
       setTimeout(() => { if (B === bb) startBattle(a, b, 'duel', mid, s); }, 2200); return;
     }
-    const win = s.w[0] >= 3, gain = win ? 500 : 150; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.id, win);
-    if (win) { const id = B.fighters[1].def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; } persist();
-    ui.result(win ? '결투 승리!' : '결투 패배...', `${s.w[0]} : ${s.w[1]}  ·  +${gain} 코인`); return;
+    const win = s.w[0] >= 3, gain = win ? 500 : 150; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.base || B.fighters[0].def.id, win);
+    if (win) { const id = B.fighters[1].def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; SAVE.mat += 2; } persist();
+    ui.result(win ? '결투 승리!' : '결투 패배...', `${s.w[0]} : ${s.w[1]}  ·  +${gain} 코인` + (win ? '  ·  각성 재료 +2' : '')); return;
   }
   if (B.mode === 'raid') { const r = ui.recordRaid(B.raid.dmg); ui.result(B.over === B.fighters[0] ? '보스 처치!' : '레이드 종료', `이번 피해 ${Math.round(B.raid.dmg).toLocaleString()}${r.isBest ? ' (최고 기록!)' : ''} · 최고 ${r.best.toLocaleString()}`); return; }
   const w = B.over, p1win = w === B.fighters[0]; let sub = '';
-  if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.id, p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; } persist(); sub = '+' + gain + ' 코인'; }
+  if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.base || B.fighters[0].def.id, p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; SAVE.mat += 1; } persist(); sub = '+' + gain + ' 코인' + (p1win ? '  ·  각성 재료 +1' : ''); }
   ui.result(B.mode === 'ai' ? (p1win ? '승리!' : '패배...') : (p1win ? '1P 승리!' : '2P 승리!'), sub);
 }
 
@@ -2156,6 +2326,7 @@ function toLobby() {
 /* ================= 시작 / 종료 ================= */
 export function runFight(foe, fx) { return new Promise(done => startBattle(picked, foe || picked, 'raidfight', fx.map || 'plain', null, { ...fx, done })); }
 export function startBattle(p1, p2, mode, mapId, series, fx) {
+  p1 = formOf(p1);   // 각성한 캐릭터를 각성 형태로 쓰는 중이면 각성 버전으로 출전
   cleanup(); lobbyHide(); world.setLobby(false);
   const map = MAPS.find(m => m.id === mapId) || MAPS[Math.floor(Math.random() * MAPS.length)], L = layoutMap(map); W = map.W; H = map.H; mouse.wx = W / 2; mouse.wy = H / 2;
   B = { barriers: [], lights: [], storm: null, fighters: [], projs: [], zones: [], lakes: [], angels: [], ghost: { x: W / 2, y: H / 2, r: 0, hp: 1, max: 1, st: {}, def: { id: 'ghost' }, cast: null, cd: {}, shield: 0, root: { position: new THREE.Vector3() } }, hexes: [], forks: [], extra: [], fxm: [], fkSeq: null, seal: null, abyss: null, lult: null, mind: null, cut: null, over: null, shake: 0, shakeT: 0, hitstop: 0, mode, time: 0, dt: .016,
@@ -2178,7 +2349,7 @@ export function startBattle(p1, p2, mode, mapId, series, fx) {
 }
 function cleanup() {
   if (!B) return;
-  B.fighters.forEach(f => { if (f.drain) endDrain(f); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
+  B.fighters.forEach(f => { if (f.drain) endDrain(f); if (f.ldom) endLdom(f, true); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
   B.lakes.forEach(removeLake); B.hexes.forEach(removeHex); B.fighters.forEach(f => f.veil && world.scene.remove(f.veil.group)); B.angels.forEach(a => world.scene.remove(a.g)); B.zones.forEach(z => z.mesh && world.scene.remove(z.mesh));
   B.fighters.forEach(f => { if (f.cast && f.cast.group) world.scene.remove(f.cast.group); }); world.setParadise(false);
   B.extra.forEach(m => world.scene.remove(m)); ui.glass(false); world.setAbyss(false); if (sealBtn) sealBtn.style.display = 'none';
@@ -2194,10 +2365,10 @@ export function init() {
   initTouch({ camDrag: (dx, dy) => { cam.yaw -= dx * .006; cam.pitch = clamp(cam.pitch + dy * .005, .25, 1.45); }, camZoom: k => { cam.dist = clamp(cam.dist * k, 5, 42); }, press: k => Q1.push(k), toggleCam: () => { if (B) { cam.fit = !cam.fit; ui.toast(cam.fit ? '시점: 둘 다 보기' : '시점: 내 캐릭터 추적'); } } });
   if (isTouch) { world.setQuality(1); vfx.density = .5; }
   ui.initUI({
-    CHARS, ORDER, SAVE, persist, picked: () => picked, pick: id => { picked = id; },
-    reset: () => { Object.assign(SAVE, { coins: 0, unlocked: ['silent'], awake: [], wins: {}, totalWins: 0, ev: null }); persist(); },
+    CHARS, ORDER, SAVE, persist, picked: () => picked, pick: id => { picked = id; }, formOf, AWAKE_COST,
+    reset: () => { Object.assign(SAVE, { coins: 0, unlocked: ['silent'], awake: [], wins: {}, totalWins: 0, ev: null, mat: 0, awakeOn: {} }); persist(); },
     start: (a, b, m) => startBattle(a, b, m), raid: () => startBattle(picked, 'shadow', 'raid'), fight: runFight, back: () => { cleanup(); ui.hideHud(); toLobby(); },
-    cheat: () => { SAVE.unlocked = [...ORDER]; SAVE.awake = ['silent', 'lich', 'shadow']; SAVE.hub = SAVE.hub || {}; SAVE.hub.pass = Object.assign({ xp: 0, f: {}, p: {} }, SAVE.hub.pass, { prem: true }); SAVE.hub.shards = (SAVE.hub.shards || 0) + 500; SAVE.tickets = (SAVE.tickets || 0) + 10; persist(); },
+    cheat: () => { SAVE.unlocked = [...ORDER]; SAVE.awake = ['silent', 'lich', 'shadow']; SAVE.hub = SAVE.hub || {}; SAVE.hub.pass = Object.assign({ xp: 0, f: {}, p: {} }, SAVE.hub.pass, { prem: true }); SAVE.hub.shards = (SAVE.hub.shards || 0) + 500; SAVE.tickets = (SAVE.tickets || 0) + 10; SAVE.mat = (SAVE.mat || 0) + 30; persist(); },
   });
   toLobby();
   requestAnimationFrame(frame);

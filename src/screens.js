@@ -111,7 +111,8 @@ export function getView() {   // 3D 캐릭터를 그릴 영역(CSS px). 화면�
   return { x: ox + view.x * s, y: oy + view.y * s, w: view.w * s, h: view.h * s, f: view.f };
 }
 let busy = 0;   // 뽑기 연출/결과가 떠 있는 동안에는 3D 캐릭터를 그리지 않는다 (UI 위를 덮어서 보상이 가려지는 문제 방지)
-export const previewId = () => busy ? null : (cur === 'chars' ? viewId : cur === 'lobby' ? api.picked() : cur === 'gacha' ? pickupId : null);
+const fid = id => (api && api.formOf ? api.formOf(id) : id);   // 각성 형태를 쓰는 중이면 각성 버전 id
+export const previewId = () => busy ? null : fid(cur === 'chars' ? viewId : cur === 'lobby' ? api.picked() : cur === 'gacha' ? pickupId : null);
 
 export function open(name) {
   ensureHost(); host.style.display = 'block';
@@ -264,7 +265,7 @@ build.chars = art => {
   const tabs = [...art.querySelectorAll(':scope>button[aria-pressed]')].filter(b => b.style.top === '22px');
   tabs.forEach(b => { const on = b.textContent.trim() === filter; b.setAttribute('aria-pressed', on); b.style.background = on ? '#ffb02e' : '#ffe4bd'; b.onclick = () => { filter = b.textContent.trim(); const l = api.ORDER.filter(x => filter === '전체' || meta(x).group === filter); if (l.length && !l.includes(viewId)) viewId = l[0]; open('chars'); }; });
   // 오른쪽 미리보기 패널
-  const id = viewId, c = api.CHARS[id], mt = meta(id), un = SAVE.unlocked.includes(id), sk = c.skills.base;
+  const id = viewId, c = api.CHARS[fid(id)], mt = meta(id), un = SAVE.unlocked.includes(id), sk = c.skills.base;
   byLabel(right, '3D 캐릭터 모델 자리').remove();
   const rchip = findText(right, '전설')?.parentElement; setText(right, '전설', mt.rar); if (rchip) rchip.style.background = RC[mt.rar][0];
   setText(right, 'CHARACTER 01', c.name); setText(right, '탱커', mt.group); setText(right, 'Lv 9 / 15', `Lv ${charLv(id)} / 15`); setText(right, '트로피 482', '트로피 ' + fmt(SAVE.tro[id] || 0));
@@ -275,6 +276,21 @@ build.chars = art => {
   bSkin.onclick = soon; bUp.onclick = soon;
   bSel.textContent = un ? (api.picked() === id ? '선택중' : '선택') : '뽑기에서 획득';
   bSel.onclick = () => { if (un) { api.pick(id); toast(c.name + ' 선택!'); open('chars'); } else toast(EVENT_ONLY.includes(id) ? '이벤트 뽑기에서만 얻을 수 있어요' : '뽑기에서만 얻을 수 있어요'); };
+  // 각성: 각성 재료를 모으면 각성시킬 수 있고, 각성 후에는 각성/일반 형태를 전환해서 쓴다
+  const base = api.CHARS[id];
+  if (un && base.awakeId) {
+    const cost = api.AWAKE_COST, done = SAVE.awake.includes(id), on = done && SAVE.awakeOn[id], mat = SAVE.mat || 0;
+    const ab = bUp;   // 업그레이드 자리(준비 중)를 각성 버튼으로 쓴다
+    ab.style.background = done ? (on ? '#ffd45c' : '#c9b8ff') : mat >= cost ? '#ffb02e' : '#e6e0ee'; ab.style.fontSize = '18px'; ab.style.whiteSpace = 'nowrap';
+    ab.innerHTML = done ? (on ? '✨ 각성 형태<br><small style="font-size:13px">눌러서 일반 전환</small>' : '일반 형태<br><small style="font-size:13px">눌러서 각성 전환</small>') : `각성하기<br><small style="font-size:14px">재료 ${mat} / ${cost}</small>`;
+    ab.onclick = () => {
+      if (!done) {
+        if (mat < cost) return toast(`각성 재료가 부족해요 (${mat} / ${cost}) · 대전에서 이기면 모을 수 있어요`);
+        SAVE.mat = mat - cost; SAVE.awake.push(id); SAVE.awakeOn[id] = true; api.persist(); toast(`${base.name} 각성 완료!`);
+      } else { SAVE.awakeOn[id] = !on; api.persist(); toast(SAVE.awakeOn[id] ? '각성 형태로 전환' : '일반 형태로 전환'); }
+      open('chars');
+    };
+  }
 };
 
 /* ---------- 이벤트 · 미션 ---------- */

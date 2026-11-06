@@ -8,6 +8,7 @@ import { loadGLB } from './glbload.js';
 const VC = {
   burn: { url: 'assets/models/burning/burning.glb', h: 2.7 },
   lily: { url: 'assets/models/lily/lily.glb', h: 2.7 },
+  pva: { url: 'assets/models/pva/pva.glb', h: 2.6 },
 };
 const cache = {};
 export const vcReady = id => cache[id];
