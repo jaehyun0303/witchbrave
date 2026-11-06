@@ -117,6 +117,13 @@ export function cinema(on) { $('#game').classList.toggle('cinema', on); }
 export function title(text, sub) {
   const e = $('#ctitle'); e.innerHTML = text ? `<div>${text}</div><small>${sub || ''}</small>` : ''; e.classList.toggle('show', !!text);
 }
+export function dim(n) {   // 암흑의 기운: 중첩(0~3)마다 시야가 좁아진다
+  let e = document.getElementById('dimv');
+  if (!e) { if (!n) return; e = document.createElement('div'); e.id = 'dimv'; e.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:30;transition:background .35s'; $('#game').appendChild(e); }
+  if (e._n === n) return; e._n = n;
+  const r = [[0, 0], [40, 62], [27, 44], [15, 30]][n] || [0, 0];
+  e.style.background = n ? `radial-gradient(circle at 50% 55%, rgba(0,0,0,0) ${r[0]}vmin, rgba(2,0,8,.96) ${r[1]}vmin)` : 'none';
+}
 export function vignette(on) { $('#game').classList.toggle('vig', on); }
 export function result(text, sub) { $('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
 export function hideHud() { hud = null; $('#mindtimer').style.display = 'none'; }

@@ -107,14 +107,20 @@ export function buildCookie(def) {
     }
     if (id === 'shadow') { for (const s of [-1, 1]) { const h = cone(.12, .6, M(0xe8e0ff), s * .4, .62, 0, 8); h.rotation.z = -s * .35; head.add(h); } }
     if (id === 'sugar') { const h = new THREE.Mesh(new THREE.TorusGeometry(.4, .04, 8, 32), new THREE.MeshBasicMaterial({ color: 0xffe0f2 })); h.position.y = .95; h.rotation.x = Math.PI / 2; head.add(h); }
-    const wp = grp(); wp.add(cyl(.04, .04, 1.4, M(0x333344), 0, -.5, 0), sph(.2, M(def.color, { e: def.color, ei: 1.4 }), 0, -1.25, 0)); wp.rotation.x = -1.0; hand.add(wp); rig.weapon = wp;
+    const wp = grp();
+    if (id === 'brave') {   // 캔디케인
+      const red = M(0xe83a4a, { r: .4 }), wht = M(0xffffff, { r: .4 });
+      for (let i = 0; i < 6; i++) wp.add(cyl(.07, .07, .26, i % 2 ? wht : red, 0, -.1 - i * .25, 0));
+      const hook = new THREE.Mesh(new THREE.TorusGeometry(.2, .07, 8, 14, Math.PI), red); hook.position.set(.2, .05, 0); wp.add(hook);
+    } else wp.add(cyl(.04, .04, 1.4, M(0x333344), 0, -.5, 0), sph(.2, M(def.color, { e: def.color, ei: 1.4 }), 0, -1.25, 0));
+    wp.rotation.x = -1.0; hand.add(wp); rig.weapon = wp;
   }
   if (id === 'lich' && lichReady()) { applyLich(rig); delete rig.extras['wing-1']; delete rig.extras['wing1']; }
   if (id === 'sugar' && sugarReady()) applySugar(rig);
   if (id === 'dark' && darkReady()) applyDark(rig);
   if (id === 'shadow' && shadowReady()) applyShadow(rig);
   if ((id === 'pv' || id === 'silent') && fbxReady(id)) applyFbx(id, rig);
-  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA') && vcReady(id)) applyVC(id, rig);
+  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA' || id === 'dkk' || id === 'burnB') && vcReady(id)) applyVC(id, rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

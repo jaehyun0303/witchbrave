@@ -98,3 +98,7 @@
 - 쿨타임 정지(`cdfreeze`)/침묵 상태면 HUD 스킬 슬롯·터치 버튼에 사슬 모양(`.bound`). 모바일 카메라: `touch.js` 의 `#tcz` 영역(한 손가락 드래그 = 회전, 두 손가락 = 줌).
 - 각성(SAVE.awake) 해금 UI는 아직 없음 → 테스트는 `WB.SAVE.awake=['silent','lich']`.
 - **각성 버닝스파이스 괴수화 스킬 (불지네)**: `CHARS.burnA.skills.beast` 별도 정의. 받는 피해 45%(`defRed`에서 `f.molt`×1%p 추가). a 돌진 600(이동기, 420px), z 꼬리치기 3000 광역+넉백, x 필멸의 불꽃 10초 직접 7000(0.1초당 70)+mflame 부여(DoT 500/s는 별도), c 포효1000+메테오12×750=10000(`meteorFx`), v 필멸의 탈피(mflame 걸린 적마다 스택 흡수→`f.molt`+1, 다시 mflame 부여, 사거리 900). 모델은 기존 갑옷 모델 ×1.4 (불지네 전용 모델 미적용).
+- **필멸 스택**: `mflameOn(t, src, n)`의 n이 스택. 괴수화 평타1/Z3/X4(시전당 1회)/C5(포효). V 필멸의 탈피는 스택 1개 흡수→`f.molt`+1(방어 1%p), 이후 mflame 재부여. DoT 500/s는 스택 수와 무관.
+- **다크카카오 쿠키 (id 'dkk', 에인션트, HP 27000)**: 모델 `www/assets/models/dkk/dkk.glb`(vcglb, 정점색 베이크 g=210, 10MB). a 베기 400 + 적 `dim`/`dimN`(3중첩, 10초 갱신, `ui.dim(n)`이 피격 본인(B.fighters[0]) 화면을 어둡게 — 적 AI에는 효과 없음). z 검 거대화(`f.bigSword` 12초, `dmgMul` ×3, `bladeM` 장식 검 메시). x 부채꼴 2000(r720). c 도약 연참 5타×300=1500, 보호막 있으면 첫 타가 보호막 전부 제거(피해 없음). v 백룡·흑룡 컷신(카메라 고정, 시네마 바+용 연출) 후 관통 검기 3000.
+- **괴수화 모델 burnB**: `www/assets/models/burnB/burnB.glb`(불지네, g=400 베이크 10MB). `mkFighter`가 burnA에게 `f.rigB`를 만들고 `animate`에서 form==='beast'일 때 `f.rig`와 swap. vcglb `fit:'max'`(긴 변 기준 6.5, 코드상 크기 ×1이며 히트박스 `r`=34). 
+- **용감한 쿠키 (id 'brave', 커먼, HP 5000, cost 0)**: 전용 모델 없이 기본 쿠키 + 캔디케인 무기(models.js). a 10, z 돌진 100 + 3초 이속 ×1.6(`spdBoostT`), x 던지기 200, c 점프 내려치기 400, v 최대 체력 10% 회복(회복불가 중엔 불가).

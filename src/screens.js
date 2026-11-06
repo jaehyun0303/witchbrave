@@ -30,6 +30,8 @@ const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   pv: { rar: '에인션트', group: '서포터', role: '마법 힐러', atk: 40, spd: 50, rng: 65 },
   dark: { rar: '레전더리', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
   burn: { rar: '비스트', group: '딜러', role: '근접 도끼 전사', atk: 72, spd: 50, rng: 22 },
+  brave: { rar: '커먼', group: '딜러', role: '근접 돌격수', atk: 25, spd: 55, rng: 22 },
+  dkk: { rar: '에인션트', group: '딜러', role: '근접 대검사', atk: 74, spd: 50, rng: 28 },
   lily: { rar: '비스트', group: '서포터', role: '꽃 마법사', atk: 55, spd: 50, rng: 70 },
 };
 // 등급제: 커먼 < 레어 < 에픽 < 슈퍼에픽 < 레전더리 < 에인션트 < 비스트 < 드래곤

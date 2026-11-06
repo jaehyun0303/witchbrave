@@ -10,6 +10,8 @@ const VC = {
   lily: { url: 'assets/models/lily/lily.glb', h: 2.7 },
   pva: { url: 'assets/models/pva/pva.glb', h: 2.6 },
   burnA: { url: 'assets/models/burnA/burnA.glb', h: 2.9 },
+  dkk: { url: 'assets/models/dkk/dkk.glb', h: 2.8 },
+  burnB: { url: 'assets/models/burnB/burnB.glb', h: 6.5, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
 };
 const cache = {};
 export const vcReady = id => cache[id];
@@ -20,7 +22,7 @@ export function preloadVC(id) {
       const obj = gl.scene; obj.traverse(o => { if (o.isMesh) { o.material.side = THREE.FrontSide; o.material.roughness = .7; o.material.metalness = 0; } });
       obj.updateMatrixWorld(true);
       const bx = new THREE.Box3().setFromObject(obj), s = bx.getSize(new THREE.Vector3());
-      cache[id] = { scene: obj, off: new THREE.Vector3(-(bx.min.x + bx.max.x) / 2, -bx.min.y, -(bx.min.z + bx.max.z) / 2), scale: d.h / s.y };
+      cache[id] = { scene: obj, off: new THREE.Vector3(-(bx.min.x + bx.max.x) / 2, -bx.min.y, -(bx.min.z + bx.max.z) / 2), scale: d.h / (d.fit === 'max' ? Math.max(s.x, s.y, s.z) : s.y), size: s };
     } catch (e) { console.warn(id + ' glb setup failed', e); }
     res(cache[id] || null);
   }, e => { console.warn(id + ' glb load failed', e); res(null); }));
@@ -30,6 +32,7 @@ export function applyVC(id, rig) {
   body.clear(); [head, legL, legR, armL, armR, torso].forEach(g => g.clear());
   const m = c.scene.clone(true); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   m.position.copy(c.off); const holder = new THREE.Group(); holder.add(m); holder.scale.setScalar(c.scale);
+  if (VC[id].fit === 'max' && c.size.x > c.size.z) holder.rotation.y = VC[id].yaw ?? -Math.PI / 2;   // 긴 몸통이 앞(+z)을 향하도록
   head.position.set(0, 1.9, 0); torso.position.set(0, 1.1, 0); armR.add(hand);
   body.add(holder, legL, legR, torso, head, armL, armR);
   if (rig.weapon) { rig.weapon.visible = false; rig.weapon = null; }
