@@ -2134,10 +2134,14 @@ function aimPoint(f) {
   }
   return foe(f);
 }
+// 아공간/영역을 전개하는 스킬 (각성 퓨어바닐라의 빛의 아공간이 켜져 있으면 다른 쿠키는 전개 불가)
+const DOMAIN_SKILLS = { silent: ['v'], lich: ['c'], shadow: ['z', 'x', 'v'], sugar: ['z', 'v'], pv: ['x'] };
+const domainBlocked = (f, k) => !!(DOMAIN_SKILLS[f.def.id] && DOMAIN_SKILLS[f.def.id].includes(k) && B.fighters.some(p => p.ldom && p.hp > 0 && p !== f && !ally(p, f) && realmOf(p) === realmOf(f)));
 function tryUse(f, k) {
   const s = f.def.skills[f.form][k];
   if (f.sealSoul && k === 'r' && f.def.id === 'shadow') return;
   if (!s || f.cd[k] > 0 || f.script || B.cut) return;
+  if (domainBlocked(f, k)) { if (!f.domMsg || B.time - f.domMsg > 1.2) { f.domMsg = B.time; toast(f, '빛의 아공간 안에서는 아공간·영역을 전개할 수 없습니다'); ui.pop(P3(f, 3.4), '🚫 전개 불가', '#fff0a8'); } return; }
   const pvc = f.def.id === 'pv' && k === 'c';
   if (f.st.stun > 0 || (f.st.lock > 0 && !pvc)) return;
   if (f.cast && !((f.cast.type === 'field' || f.cast.type === 'paradise') && k === 'v')) return;
