@@ -1707,7 +1707,7 @@ function mflameOn(t, src, n = 0) {   // 필멸의 불꽃: 초당 500, 퓨어바�
   if (n > 0) { t.mflame.stacks = Math.min(99, (t.mflame.stacks || 0) + n); ui.pop(P3(t, 3.0), '필멸 ×' + t.mflame.stacks, '#ff9a60'); }
 }
 function startBeast(t) {   // 패시브: 죽으면 괴수화하여 부활 (HP 12000)
-  t.beastUsed = true; t.form = 'beast'; t.formT = 1e9; t.max = 12000; t.hp = 12000; t.shield = 0; t.shieldMax = 0; t.burn = null; t.mflame = null; t.noHeal = 0; t.hpPrev = 12000; t.r = 34; clearStates(t);
+  t.beastUsed = true; t.form = 'beast'; t.formT = 1e9; t.max = 12000; t.hp = 12000; t.shield = 0; t.shieldMax = 0; t.burn = null; t.mflame = null; t.noHeal = 0; t.hpPrev = 12000; t.r = 48; clearStates(t);
   for (const k of ['stun', 'silence', 'slow', 'lock', 'rev', 'charm', 'ctl', 'cdfreeze']) t.st[k] = 0; t.st.inv = 1.5; t.flash = 0;
   const p = P3(t, 1.4);
   vfx.burst('glow', p, 110, { speed: 5, speed2: 22, life: 1.2, life2: 2, size: 1.4, c0: 0xffffff, c1: 0xff2a00, up: 3 }); vfx.burst('spark', p, 80, { speed: 8, speed2: 24, life: 1, size: .8, c0: 0xffe090, c1: 0xff3a10, grav: 3 });
@@ -1727,7 +1727,7 @@ function startBoss(f) {   // V: 맵을 반으로 가르고 불바다 + 20초간 
 }
 function endBoss(f) {
   const sv = f.bossSave || { max: f.def.hp, pm: 1, area: 1 }, r = f.hp / f.max; f.boss = 0;
-  f.max = f.form === 'beast' ? 12000 : f.def.hp; f.hp = Math.max(1, Math.min(f.max, r * f.max)); f.rooted = false; f.pm = sv.pm; f.area = sv.area; f.r = f.form === 'beast' ? 34 : 22; f.hpPrev = f.hp;
+  f.max = f.form === 'beast' ? 12000 : f.def.hp; f.hp = Math.max(1, Math.min(f.max, r * f.max)); f.rooted = false; f.pm = sv.pm; f.area = sv.area; f.r = f.form === 'beast' ? 48 : 22; f.hpPrev = f.hp;
   ui.pop(P3(f, 4.4), '보스 모드 종료', '#ffb070', true); vfx.ring(P3(f), { r0: 1, r1: 20, dur: .8, color: 0xff6a30 });
 }
 function updFire(dt) {
