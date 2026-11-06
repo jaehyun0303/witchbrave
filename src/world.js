@@ -120,6 +120,7 @@ export function createWorld(canvas) {
       mapG.children.slice().forEach(c => { mapG.remove(c); c.traverse(o => o.geometry && o.geometry.dispose()); });
       crystals.length = 0; bushList.length = 0; propList.length = 0;
     },
+    clearBushes() { bushList.forEach(g => mapG.remove(g)); bushList.length = 0; },
     // 지형지물 파괴: 중심 (x,y 로직 좌표) 반경 R 안의 장식물을 지우고 부순 것들의 목록을 돌려준다
     breakProps(cx, cy, R) {
       const gone = [];

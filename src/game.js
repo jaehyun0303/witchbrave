@@ -39,7 +39,7 @@ const foe = f => { let best = null, bd = 1e18; for (const o of B.fighters) { if 
 
 /* ================= 데미지 / 상태 ================= */
 const dmgMul = f => (f.pm || 1) * (f.st.lightBuff > 0 ? 1.25 : 1) * (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1) * (f.form === 'hour' ? 1.3 : 1) * (f.sealSoul ? .5 : 1);
-const defRed = f => (f.mindBuff ? .05 : 0) + (f.giant > 0 ? .35 : 0);
+const defRed = f => Math.min(.95, (f.mindBuff ? .05 : 0) + (f.giant > 0 ? .35 : 0) + (f.def.id === 'burnA' && f.form === 'beast' ? .55 + (f.molt || 0) * .01 : 0));   // 불지네 괴수화: 받는 피해 45% (필멸의 탈피 스택마다 1%p 추가 감소)
 const spdMul = f => (f.spdBoost || 1) * (f.mindBuff ? 1.15 : 1) * (f.form === 'dragon' ? 1.1 : 1);
 const toast = (f, t) => { if (f.ctrl.kind !== 'ai') ui.toast(t); };
 const shake = (a, t = .3) => { B.shake = Math.max(B.shake, a); B.shakeT = Math.max(B.shakeT, t); };
@@ -75,7 +75,7 @@ function hurt(src, t, n, o = {}) {
   if (!o.field && t.cast && t.cast.type === 'field') endField(t);
   if (t.hp <= 0) {
     if (src && src !== t && src.undy > 0) undyKill(src);   // 버닝스파이스 패시브: 불사 중 처치하면 체력 1000 회복
-    if (t.ult && t.ult.armed && !t.soul) enterSoul(t); else if (t.def.id === 'burn' && !t.undyUsed && !t.minion) startUndy(t); else onDeath(t);
+    if (t.ult && t.ult.armed && !t.soul) enterSoul(t); else if (t.def.id === 'burn' && !t.undyUsed && !t.minion) startUndy(t); else if (t.def.id === 'burnA' && !t.beastUsed && !t.minion) startBeast(t); else onDeath(t);
   }
 }
 function hitFX(t, color, big, dir) {
@@ -312,7 +312,7 @@ const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === 
 function gameCamPose() {
   let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
   const tgt = cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
-  const big = (a.form === 'dragon' || b.form === 'dragon' ? 1.15 : 1) * (a.big || b.big ? 1.9 : 1);
+  const big = (a.form === 'dragon' || b.form === 'dragon' ? 1.15 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
   const d = cam.dist * big + (cam.fit ? sep * .45 : 0), cp = Math.cos(cam.pitch);
   return { pos: tgt.clone().add(new THREE.Vector3(Math.sin(cam.yaw) * cp * d, Math.sin(cam.pitch) * d, Math.cos(cam.yaw) * cp * d)), look: tgt, fov: 42 };
 }
@@ -903,6 +903,7 @@ const ally = (a, b) => a !== b && a.team !== undefined && a.team === b.team;
 const inBarrier = (src, t) => B.barriers.length > 0 && B.barriers.some(b => b.owner !== src && !ally(b.owner, src) && (b.owner === t || ally(b.owner, t)) && Math.hypot(t.x - b.x, t.y - b.y) < b.r);
 function cleanse(t) {
   for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) t.st[k] = 0;
+  if (t.mflame) { t.mflame = null; ui.pop(P3(t, 4), '🔥 필멸의 불꽃 해제!', '#fff3b0', true); }   // 필멸의 불꽃은 퓨어바닐라의 정화로만 꺼진다
   ui.pop(P3(t, 3.2), '✨ 디버프 해제', '#fff3b0'); vfx.ring(P3(t), { r0: .4, r1: 4, dur: .5, color: PVC });
 }
 
@@ -1500,7 +1501,16 @@ function burnOn(t, src, dur = 4, dps = 300) {   // 화상: 0.5초마다 도트 �
 function act(f, dur, upd, end) { f.script = { t: 0, steps: [], end: dur, onEnd: () => { if (f.act) f.act.upd(1, 0); f.act = null; end && end(); } }; f.act = { t: 0, dur, upd }; }
 function updCommon(f, dt) {   // 전 캐릭터 공통: 화상, 불사, 거대화, 수명, 자연 회복
   if (f.hp <= 0) { f.burn = null; return; }
-  if (f.def.id === 'pva') { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) f.st[k] = 0; f.burn = null; f.mindBuff = false; }   // 각성 퓨어바닐라: 디버프 면역
+  if (f.def.id === 'pva') { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) f.st[k] = 0; f.burn = null; f.mflame = null; f.noHeal = 0; f.mindBuff = false; }   // 각성 퓨어바닐라: 디버프 면역
+  if (f.noHeal > 0) { f.noHeal -= dt; if (f.hpPrev !== undefined && f.hp > f.hpPrev) f.hp = f.hpPrev; }   // 회복 불가: 늘어난 체력은 되돌린다
+  f.hpPrev = f.hp;
+  if (f.mflame) {   // 필멸의 불꽃: 초당 500, 퓨어바닐라의 버프(마법의 빛)나 미스틱플라워의 힐(f.mysticHeal)이 있어야만 해제
+    const m = f.mflame; m.tick -= dt; const p = P3(f, 1);
+    if (Math.random() < .9) vfx.emit('glow', { x: p.x + rnd(-.5, .5), y: rnd(.3, 2.4), z: p.z + rnd(-.5, .5), vy: rnd(2, 6), life: .5, s0: .6, s1: 0, c0: 0xff4a20, c1: 0x300000, drag: 0 });
+    if (f.st.lightBuff > 0 || f.mysticHeal > 0) { f.mflame = null; ui.pop(P3(f, 4), '🔥 필멸의 불꽃 해제!', '#fff3b0', true); }
+    else if (m.tick <= 0) { m.tick = .5; const d = m.dps * .5; hurt(m.src, f, d / dmgMul(m.src), { quiet: true, field: true }); ui.pop(P3(f, 2.8), Math.round(d), '#ff3a20'); }
+  }
+  if (f.boss > 0) { f.boss -= dt; if (f.boss <= 0) endBoss(f); }
   if (f.undy > 0) {
     f.undy -= dt; const p = P3(f, 1.2);
     if (Math.random() < .7) vfx.emit('glow', { x: p.x + rnd(-.7, .7), y: rnd(.2, 2.6), z: p.z + rnd(-.7, .7), vy: rnd(2, 6), life: .6, s0: .6, s1: 0, c0: 0xffd070, c1: 0xff3a00, drag: 0 });
@@ -1685,6 +1695,162 @@ function updBurnCut(dt) {
   }
   camState.pos.copy(pos); camState.look.copy(look); camState.fov = fov;
 }
+/* ===== 각성 버닝스파이스 쿠키 (HP 40000, 보호막 1000, 패시브: 죽으면 괴수화 부활 HP 12000) ===== */
+function mflameOn(t, src) {   // 필멸의 불꽃: 초당 500, 퓨어바닐라의 버프/미스틱플라워의 힐로만 해제
+  if (!t || t.hp <= 0 || t.undy > 0 || t.def.id === 'pva' || inLdom(t)) return;
+  const dps = 500 * (src.boss > 0 ? 3 : 1);
+  if (!t.mflame) { t.mflame = { src, dps, tick: .5 }; ui.pop(P3(t, 3.4), '🔥 필멸의 불꽃', '#ff3a20', true); } else { t.mflame.dps = Math.max(t.mflame.dps, dps); t.mflame.src = src; }
+}
+function startBeast(t) {   // 패시브: 죽으면 괴수화하여 부활 (HP 12000)
+  t.beastUsed = true; t.form = 'beast'; t.formT = 1e9; t.max = 12000; t.hp = 12000; t.shield = 0; t.shieldMax = 0; t.burn = null; t.mflame = null; t.noHeal = 0; t.hpPrev = 12000; clearStates(t);
+  for (const k of ['stun', 'silence', 'slow', 'lock', 'rev', 'charm', 'ctl', 'cdfreeze']) t.st[k] = 0; t.st.inv = 1.5; t.flash = 0;
+  const p = P3(t, 1.4);
+  vfx.burst('glow', p, 110, { speed: 5, speed2: 22, life: 1.2, life2: 2, size: 1.4, c0: 0xffffff, c1: 0xff2a00, up: 3 }); vfx.burst('spark', p, 80, { speed: 8, speed2: 24, life: 1, size: .8, c0: 0xffe090, c1: 0xff3a10, grav: 3 });
+  for (let i = 0; i < 3; i++) vfx.ring(P3(t), { r0: .5, r1: 10 + i * 6, dur: .7 + i * .2, color: i % 2 ? 0xffd070 : 0xff2a00 }); vfx.column(P3(t), { r: 3.2, h: 40, dur: 1.4, color: 0xff3a10, alpha: .8 });
+  ui.flash('#ff2a00', .8, .6); shake(1.4, .8); ui.pop(P3(t, 4.6), '👹 괴수화!', '#ff6a30', true); toast(t, '괴수화! 체력 12000으로 부활했습니다');
+}
+function startBoss(f) {   // V: 맵을 반으로 가르고 불바다 + 20초간 거대 보스 모드
+  const r = f.hp / f.max; f.bossSave = { max: f.max, pm: f.pm || 1, area: f.area || 1 }; f.boss = 20;
+  f.max = 999999; f.hp = Math.max(1, r * 999999); f.shield = f.shieldMax = 0; f.rooted = true; f.pm = f.bossSave.pm * 6; f.area = f.bossSave.area * 2.5; f.r = 110;   // 비례 변환, 이동 불가, 딜·범위 폭증
+  const cx = W / 2; breakTerrain(W / 2, H / 2, Math.hypot(W, H)); B.bushes = []; world.clearBushes();   // 모든 지형지물 소멸
+  const fs = B.fire = { owner: f, t: 0, dur: 20, tick: 0, meshes: [] };
+  const fm = new THREE.Mesh(new THREE.PlaneGeometry(W * S, H * S), new THREE.MeshBasicMaterial({ color: 0xff3a10, transparent: true, opacity: .0, depthWrite: false, blending: THREE.AdditiveBlending })); fm.rotation.x = -Math.PI / 2; fm.position.y = .12; fm.renderOrder = 3; addExtra(fm); fs.sea = fm;
+  const cm = new THREE.Mesh(new THREE.PlaneGeometry(3, H * S), new THREE.MeshBasicMaterial({ color: 0xffd070, transparent: true, opacity: .0, depthWrite: false, blending: THREE.AdditiveBlending })); cm.rotation.x = -Math.PI / 2; cm.position.set(W3(cx, H / 2).x, .14, 0); cm.renderOrder = 4; addExtra(cm); fs.crack = cm;   // 맵을 가르는 균열
+  const p = P3(f, 1.5); vfx.burst('glow', p, 140, { speed: 6, speed2: 30, life: 1.4, life2: 2.4, size: 1.8, c0: 0xffffff, c1: 0xff2a00, up: 4 }); for (let i = 0; i < 4; i++) vfx.ring(P3(f), { r0: 1, r1: 30 + i * 18, dur: .8 + i * .3, color: i % 2 ? 0xffd070 : 0xff2a00 });
+  ui.flash('#ff2a00', 1, .7); shake(2, 1.2); ui.title(f.def.name, 'BOSS MODE'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2400);
+  ui.pop(P3(f, 7), '🔥 불바다 · 보스 모드!', '#ff6a30', true); toast(f, '맵이 갈라지고 불바다! 20초간 이동할 수 없지만 체력 999999, 모든 스킬이 거대해집니다');
+}
+function endBoss(f) {
+  const sv = f.bossSave || { max: f.def.hp, pm: 1, area: 1 }, r = f.hp / f.max; f.boss = 0;
+  f.max = f.form === 'beast' ? 12000 : f.def.hp; f.hp = Math.max(1, Math.min(f.max, r * f.max)); f.rooted = false; f.pm = sv.pm; f.area = sv.area; f.r = 22; f.hpPrev = f.hp;
+  ui.pop(P3(f, 4.4), '보스 모드 종료', '#ffb070', true); vfx.ring(P3(f), { r0: 1, r1: 20, dur: .8, color: 0xff6a30 });
+}
+function updFire(dt) {
+  const fs = B.fire; if (!fs) return; fs.t += dt; fs.tick -= dt;
+  const u = fs.t / fs.dur, fade = Math.min(1, fs.t / .8) * (1 - sstep(.9, 1, u));
+  fs.sea.material.opacity = (.34 + Math.sin(fs.t * 6) * .08) * fade; fs.crack.material.opacity = (.8 + Math.sin(fs.t * 9) * .2) * fade; fs.crack.scale.x = 1 + Math.sin(fs.t * 5) * .3;
+  for (let i = 0; i < 5; i++) { const x = rnd(0, W), y = rnd(0, H); vfx.emit('glow', { x: W3r(x, y).x, y: .3, z: W3r(x, y).z, vy: rnd(3, 9), life: rnd(.6, 1.2), s0: rnd(.8, 1.6), s1: 0, c0: 0xffc060, c1: 0xff2a00, a: .8, drag: 0 }); }
+  if (fs.tick <= 0) {
+    fs.tick = 1;   // 1초당 200
+    for (const o of B.fighters) if (o.hp > 0 && !o.realm && o !== fs.owner && !ally(fs.owner, o) && !o.minion) { hurt(fs.owner, o, 200 / dmgMul(fs.owner), { quiet: true, field: true }); ui.pop(P3(o, 2.8), '200', '#ff6a30'); }   // 보스 모드 딜 배수와 무관하게 초당 200
+  }
+  if (fs.t >= fs.dur) { world.scene.remove(fs.sea); world.scene.remove(fs.crack); B.fire = null; }
+}
+function footFx(x, y, delay) {   // 붉은 에너지로 이루어진 거대한 인간의 발바닥
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: 0xff3a20, transparent: true, opacity: .6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const sole = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mat); sole.scale.set(1.8, .35, 3.2); g.add(sole);
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), mat); heel.scale.set(1.5, .3, 1.4); heel.position.z = -2.6; g.add(heel);
+  [[-1.1, .66], [-.55, .62], [0, .58], [.55, .52], [1.1, .44]].forEach(([tx, ts], i) => { const t = new THREE.Mesh(new THREE.SphereGeometry(ts * .55, 10, 8), mat); t.position.set(tx, 0, 3.6 + (i === 0 || i === 4 ? -.3 : i === 2 ? .2 : 0)); t.scale.y = .5; g.add(t); });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffd0a0, transparent: true, opacity: .5, depthWrite: false, blending: THREE.AdditiveBlending })); core.scale.set(1.1, .25, 2.4); g.add(core);
+  g.scale.setScalar(1.7); g.rotation.y = rnd(0, 6.283); const T = delay + .45, gp = W3(x, y, 0); let hit = false; g.position.copy(gp).setY(44);
+  addFxm(g, T, (u, m, t) => {
+    if (t < delay) { m.position.y = lerp(44, .4, (t / delay) ** 2); m.children.forEach(c => c.material.opacity = Math.min(.6, t / .15 * .6)); }
+    else { m.position.y = .4; const k = (t - delay) / .45; mat.opacity = .85 * (1 - k); m.scale.setScalar(1.7 * (1 + k * .15)); }
+    if (t >= delay && !hit) { hit = true; vfx.ring(gp, { r0: .5, r1: 8, dur: .5, color: 0xff6a30 }); vfx.burst('spark', gp.clone().setY(.6), 24, { speed: 7, speed2: 18, life: .6, size: .6, c0: 0xffffff, c1: 0xff3a10, grav: 6 }); shake(.5, .2); }
+  });
+}
+CHARS.burnA = {
+  id: 'burnA', base: 'burn', name: '각성 버닝스파이스 쿠키', color: BRN, fx: 0xff5a1a, cost: 0, hp: 40000, shield: 1000, pref: 3.6, atkRange: 190, aiPref: 100, tag: '화염 · 괴수화 · 필멸의 불꽃 · 불바다',
+  passive: '죽으면 괴수화하여 체력 12000으로 부활합니다. (한 경기에 1번)',
+  skills: {
+    base: {
+      a: { name: '쾅 내려찍기', cd: 1.1, desc: '도끼로 쾅 내려찍는 광역 공격 700. 맞은 적은 3초간 체력 회복 불가', use(f) {
+        setAnim(f, 'slash', .4); f.swingDir = 1; const ar = f.area || 1, c = { x: f.x + Math.cos(f.face) * 130 * ar, y: f.y + Math.sin(f.face) * 130 * ar }, R = 200 * ar, w = W3r(c.x, c.y, 0);
+        vfx.ring(w, { r0: .5, r1: R * S, dur: .45, color: BRN }); vfx.ring(w, { r0: .3, r1: R * S * .6, dur: .6, color: 0xffd070, alpha: .7 }); vfx.burst('spark', w.clone().setY(.6), 30, { speed: 7, speed2: 18, life: .6, size: .6, c0: 0xffffff, c1: BRN, grav: 5 }); shake(.5 * Math.min(2, ar), .25); B.hitstop = Math.max(B.hitstop, .05);
+        for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && Math.hypot(t.x - c.x, t.y - c.y) < R + t.r) { hurt(f, t, 700, { dir: f.face }); t.noHeal = Math.max(t.noHeal || 0, 3); ui.pop(P3(t, 3.8), '💔 회복 불가', '#ffb0b0'); }
+      } },
+      z: { name: '발바닥 낙하', cd: 35, desc: '위로 점프. 하늘에서 거대한 붉은 에너지의 발바닥이 매우 많이 내려찍음. 발바닥 1개당 2000', use(f) {
+        const e = foe(f); if (!e || e === B.ghost || e.hp <= 0) { toast(f, '대상이 없습니다'); return false; }
+        setAnim(f, 'cast', .5); f.pose = 'leap'; f.st.inv = Math.max(f.st.inv, 4.5); let sp = 0; const ar = f.area || 1;
+        act(f, 4.4, (u, dt) => {
+          const t = u * 4.4;
+          if (t < .5) f.air = 12 * ease.out(t / .5); else if (t < 3.9) f.air = 12; else f.air = 12 * (1 - ((t - 3.9) / .5) ** 2);
+          sp -= dt;
+          if (t > .6 && t < 3.9 && sp <= 0) {
+            sp = .2; const tg = foe(f); if (!tg || tg === B.ghost) return; const near = Math.random() < .55, a = rnd(0, 6.283), d = near ? rnd(0, 170) : rnd(150, 700 * ar);
+            const x = clamp(tg.x + Math.cos(a) * d, PAD, W - PAD), y = clamp(tg.y + Math.sin(a) * d, PAD, H - PAD);
+            zone(f, { x, y, r: 125, delay: .55, dmg: 2000, color: 0xff3a20 }); footFx(x, y, .55);
+          }
+        }, () => { f.air = 0; f.pose = null; f.st.inv = 0; });
+      } },
+      x: { name: '필멸의 불꽃', cd: 16, desc: '필멸의 불꽃을 4초간 계속 뿜음. 맞으면 초당 500씩 피가 닳고, 퓨어바닐라 쿠키의 버프나 미스틱플라워 쿠키의 힐 없이는 해제 불가', use(f) {
+        setAnim(f, 'cast', .5); f.pose = 'raise'; let tick = 0; const ar = f.area || 1, L = 650 * ar;
+        act(f, 4, (u, dt) => {
+          const tg = foe(f); if (tg && tg !== B.ghost) f.face = ang(f, tg);
+          const dx = Math.cos(f.face), dy = Math.sin(f.face), p = P3(f, 2.2);
+          for (let i = 0; i < 5; i++) { const sp = rnd(10, 26), sd = rnd(-.22, .22); vfx.emit('glow', { x: p.x, y: p.y, z: p.z, vx: (Math.cos(f.face + sd)) * sp, vy: rnd(-1, 1.5), vz: (Math.sin(f.face + sd)) * sp, life: rnd(.4, .7), s0: rnd(.8, 1.6), s1: .2, c0: 0xffd070, c1: 0xff2a00, a: .9, drag: 1 }); }
+          tick -= dt; if (tick <= 0) { tick = .1; for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && Math.hypot(t.x - f.x, t.y - f.y) < L + t.r && adiff(ang(f, t), f.face) < .5) mflameOn(t, f); }
+        }, () => { f.pose = null; });
+      } },
+      c: { name: '분노의 포효·초음파', cd: 40, desc: '포효(1500) 후 크게 발을 내려찍어 광역 초음파(2500), 도끼를 사방으로 던짐(500 × 8, 이후 적을 추적). 총 8000', use(f) {
+        setAnim(f, 'cast', .8); f.pose = 'raise'; const ar = f.area || 1;
+        runScript(f, [
+          { at: .55, fn: () => { shock(f, 450 * ar, BRN, 1500); ui.flash('#ff8a30', .6, .45); shake(1.2, .7); ui.pop(P3(f, 4.4), '🔥 포효!', '#ffb050', true); for (let i = 0; i < 3; i++) vfx.ring(P3(f), { r0: .5, r1: 12 + i * 8, dur: .6 + i * .2, color: i % 2 ? 0xffd070 : BRN }); } },
+          { at: 1.25, fn: () => { f.pose = null; setAnim(f, 'slash', .4); shock(f, 700 * ar, 0xffd070, 2500); vfx.ring(P3(f), { r0: 1, r1: 700 * ar * S, dur: .9, color: 0xffffff, alpha: .8 }); vfx.column(P3(f), { r: 3, h: 30, dur: .6, color: 0xff6a30, alpha: .7 }); shake(1.6, .9); B.hitstop = Math.max(B.hitstop, .12); ui.flash('#ffd070', .5, .4); ui.pop(P3(f, 4.4), '📢 초음파!', '#ffe090', true); } },
+          { at: 1.6, fn: () => { for (let i = 0; i < 8; i++) shoot(f, { a: i / 8 * 6.283, sp: 650, r: 18, dmg: 500, color: BRN, kind: 'axe', life: 2.6, homing: 2200, turn: 3.2, pierce: false }); ui.pop(P3(f, 3.8), '🪓 도끼 난무!', '#ffb050'); } },
+        ], 2.0, () => { f.pose = null; });
+      } },
+      v: { name: '불바다 · 보스 모드', cd: 90, desc: '맵을 반으로 가르고 모든 지형지물을 없애 불바다로(20초, 초당 200). 20초간 거대한 보스가 되어 체력 999999(비례 변환), 이동 불가, 모든 스킬의 딜·범위 폭증', use(f) { if (f.boss > 0) return false; setAnim(f, 'cast', .8); startBoss(f); } },
+    }
+  }
+};
+function meteorFx(x, y, delay) {   // 하늘에서 떨어지는 불타는 운석
+  const g = new THREE.Group(), rock = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 1), new THREE.MeshStandardMaterial({ color: 0x3a1408, emissive: 0xff4a10, emissiveIntensity: 1.2, flatShading: true }));
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(2.6, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff8a30, transparent: true, opacity: .45, depthWrite: false, blending: THREE.AdditiveBlending })); g.add(rock, glow);
+  const gp = W3(x, y, 0), sx = rnd(-14, 14), sz = rnd(-14, 14); let hit = false;
+  addFxm(g, delay + .3, (u, m, t) => {
+    const k = Math.min(1, t / delay); m.position.set(gp.x + sx * (1 - k), lerp(46, .8, k * k), gp.z + sz * (1 - k)); rock.rotation.x += .1; rock.rotation.y += .13;
+    if (t < delay) { const p = m.position; vfx.emit('glow', { x: p.x, y: p.y, z: p.z, life: .45, s0: 2, s1: 0, c0: 0xffc060, c1: 0xff2a00, a: .8, drag: 0 }); }
+    else { m.visible = false; if (!hit) { hit = true; vfx.ring(gp, { r0: .5, r1: 9, dur: .55, color: 0xff6a30 }); vfx.burst('spark', gp.clone().setY(.6), 26, { speed: 8, speed2: 20, life: .7, size: .7, c0: 0xffffff, c1: 0xff3a10, grav: 6 }); vfx.burst('glow', gp.clone().setY(1), 14, { speed: 3, speed2: 10, life: .8, size: 1.6, c0: 0xffd070, c1: 0xff2a00, up: 3 }); shake(.6, .25); } }
+  });
+}
+function moltFx(f) {   // 필멸의 탈피: 불지네가 껍질을 벗는다
+  const p = P3(f, 1.4); vfx.burst('glow', p, 70, { speed: 4, speed2: 18, life: 1, life2: 1.6, size: 1.4, c0: 0xffe0a0, c1: 0xff2a00, up: 2 }); vfx.burst('spark', p, 50, { speed: 8, speed2: 22, life: .9, size: .7, c0: 0xffffff, c1: 0xff6a10, grav: 4 });
+  for (let i = 0; i < 3; i++) vfx.ring(P3(f), { r0: .5, r1: 10 + i * 5, dur: .6 + i * .15, color: i % 2 ? 0xffd070 : 0xff2a00 });
+}
+CHARS.burnA.skills.beast = {   // 괴수화: 거대 불지네 (받는 피해 45%)
+  a: { name: '불지네 돌진', cd: 1.4, desc: '앞으로 돌진하며 공격(600). 이동기', use(f) {
+    const tg = foe(f), a = tg && tg !== B.ghost ? ang(f, tg) : f.face, ar = f.area || 1; f.face = a; setAnim(f, 'slash', .4); const hit = new Set(), L = 420 * ar, sp = 1700; let mv = 0;
+    act(f, L / sp + .08, (u, dt) => {
+      const st = Math.min(L - mv, sp * dt); mv += st; f.x = clamp(f.x + Math.cos(a) * st, PAD, W - PAD); f.y = clamp(f.y + Math.sin(a) * st, PAD, H - PAD);
+      const p = P3(f, 1); vfx.emit('glow', { x: p.x, y: p.y, z: p.z, life: .45, s0: 1.8, s1: 0, c0: 0xffc060, c1: 0xff2a00, a: .8, drag: 0 });
+      for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && !hit.has(t) && realmOf(t) === realmOf(f) && dist(f, t) < f.r * 1.3 + t.r + 70 * ar) { hit.add(t); hurt(f, t, 600, { dir: a }); vfx.burst('spark', P3(t, 1), 14, { speed: 6, speed2: 16, life: .5, size: .5, c0: 0xffffff, c1: BRN, grav: 5 }); shake(.35, .2); }
+    });
+  } },
+  z: { name: '꼬리치기', cd: 12, desc: '거대한 꼬리로 주위를 쓸어버리는 광역 꼬리치기 (3000)', use(f) {
+    setAnim(f, 'slash', .6); f.pose = 'raise'; const ar = f.area || 1;
+    runScript(f, [{ at: .45, fn: () => { f.pose = null; shock(f, 520 * ar, 0xff7a24, 3000, t => { const k = ang(f, t); t.x = clamp(t.x + Math.cos(k) * 120, PAD, W - PAD); t.y = clamp(t.y + Math.sin(k) * 120, PAD, H - PAD); }); vfx.column(P3(f), { r: 3, h: 22, dur: .5, color: 0xff6a30, alpha: .7 }); shake(1.1, .5); B.hitstop = Math.max(B.hitstop, .1); ui.pop(P3(f, 4.4), '🐛 꼬리치기!', '#ffb050', true); } }], .9, () => { f.pose = null; });
+  } },
+  x: { name: '필멸의 불꽃 (불지네)', cd: 24, desc: '필멸의 불꽃을 10초간 뿜음. 총 7000 (맞은 적은 필멸의 불꽃 상태가 됨)', use(f) {
+    setAnim(f, 'cast', .5); f.pose = 'raise'; let tick = 0; const ar = f.area || 1, L = 700 * ar;
+    act(f, 10, (u, dt) => {
+      const tg = foe(f); if (tg && tg !== B.ghost) f.face = ang(f, tg);
+      const p = P3(f, 2.4);
+      for (let i = 0; i < 7; i++) { const sp = rnd(12, 30), sd = rnd(-.25, .25); vfx.emit('glow', { x: p.x, y: p.y, z: p.z, vx: Math.cos(f.face + sd) * sp, vy: rnd(-1, 1.5), vz: Math.sin(f.face + sd) * sp, life: rnd(.4, .8), s0: rnd(1, 2), s1: .2, c0: 0xffd070, c1: 0xff2a00, a: .9, drag: 1 }); }
+      tick -= dt; if (tick <= 0) { tick = .1; for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && Math.hypot(t.x - f.x, t.y - f.y) < L + t.r && adiff(ang(f, t), f.face) < .55) { hurt(f, t, 70, { quiet: true, field: true }); mflameOn(t, f); } }   // 0.1초당 70 × 100틱 = 7000
+    }, () => { f.pose = null; });
+  } },
+  c: { name: '포효 · 메테오', cd: 45, desc: '포효 후 하늘에서 메테오가 여러 개 떨어짐. 총 10000 (포효 1000 + 메테오 12개 × 750)', use(f) {
+    setAnim(f, 'cast', .8); f.pose = 'raise'; const ar = f.area || 1;
+    const steps = [{ at: .55, fn: () => { shock(f, 500 * ar, BRN, 1000); ui.flash('#ff8a30', .6, .45); shake(1.2, .7); ui.pop(P3(f, 5), '🔥 포효!', '#ffb050', true); f.pose = null; } }];
+    for (let i = 0; i < 12; i++) steps.push({ at: 1.0 + i * .22, fn: () => {
+      const tg = foe(f); if (!tg || tg === B.ghost) return; const a = rnd(0, 6.283), d = i < 4 ? rnd(0, 60) : rnd(40, 110 * ar);   // 가만히 있으면 전부 맞는 범위 (총 10000)
+      const x = clamp(tg.x + Math.cos(a) * d, PAD, W - PAD), y = clamp(tg.y + Math.sin(a) * d, PAD, H - PAD);
+      zone(f, { x, y, r: 130, delay: .7, dmg: 750, color: 0xff4a10 }); meteorFx(x, y, .7);
+    } });
+    runScript(f, steps, 3.9, () => { f.pose = null; });
+  } },
+  v: { name: '필멸의 탈피', cd: 22, desc: '필멸의 불꽃이 걸린 적의 필멸 스택 1개를 흡수해 방어력 1% 획득. 그리고 적에게 필멸의 불꽃을 부여', use(f) {
+    const ar = f.area || 1, R = 900 * ar, es = B.fighters.filter(t => t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && dist(f, t) < R + t.r);
+    if (!es.length) { toast(f, '사거리 밖'); return false; }
+    setAnim(f, 'cast', .8); f.pose = 'raise';
+    runScript(f, [{ at: .6, fn: () => {
+      f.pose = null; moltFx(f); ui.flash('#ff8a30', .5, .4); shake(1, .5);
+      for (const t of es) { if (t.hp <= 0) continue; if (t.mflame) { t.mflame = null; f.molt = Math.min(40, (f.molt || 0) + 1); ui.pop(P3(f, 4.6), '🛡 방어력 +1% (총 ' + f.molt + '%)', '#ffd070', true); } mflameOn(t, f); vfx.ring(P3(t), { r0: .5, r1: 8, dur: .5, color: 0xff3a20 }); }
+    } }], 1.0, () => { f.pose = null; });
+  } },
+};
+CHARS.burn.awakeId = 'burnA';
 /* ===== 세인트릴리 쿠키 (HP 23000, 원거리 꽃 마법사 / 서포터) ===== */
 const LILY = 0xffc8ea, LILYG = 0x6fe0a0;
 function addFxm(m, dur, fn) { addExtra(m); B.fxm.push({ m, t: 0, dur, fn }); }   // 시간에 따라 움직이는 연출용 메시
@@ -1973,7 +2139,7 @@ function removeFighter(f) { world.scene.remove(f.root); }
 const rot = (o, x, y, z) => o.rotation.set(x, y, z);
 function animate(f, dt) {
   f.at += dt;
-  if (f.big) f.root.scale.setScalar(f.big); else if (f.def.id === 'burn') f.root.scale.setScalar(lerp(f.root.scale.x, f.giant > 0 ? 1.85 : 1, .12)); else if (f.def.id === 'dark') f.root.scale.setScalar(lerp(f.root.scale.x, f.form === 'witch' ? 1.3 : 1, .15));
+  if (f.big) f.root.scale.setScalar(f.big); else if (f.def.id === 'burn') f.root.scale.setScalar(lerp(f.root.scale.x, f.giant > 0 ? 1.85 : 1, .12)); else if (f.def.id === 'burnA') f.root.scale.setScalar(lerp(f.root.scale.x, f.boss > 0 ? 5 : f.form === 'beast' ? 1.4 : 1, .06)); else if (f.def.id === 'dark') f.root.scale.setScalar(lerp(f.root.scale.x, f.form === 'witch' ? 1.3 : 1, .15));
   const T = f.at, dead = f.hp <= 0, dragon = f.form === 'dragon';
   // 위치/방향
   const tp = P3(f, 0);
@@ -2103,7 +2269,7 @@ function aiInput(f) {
   if (f.aggro && B.explore && d > f.aggro && f.hp >= f.max * .999) return inp;
   f.ai.t -= dt; if (f.ai.t <= 0) { f.ai.t = .6 + Math.random() * .8; f.ai.strafe = Math.random() < .5 ? 1 : -1; }
   if (d > pref) { inp.mx = Math.cos(a); inp.my = Math.sin(a); } else if (d < pref * .6) { inp.mx = -Math.cos(a); inp.my = -Math.sin(a); } else { inp.mx = -Math.sin(a) * f.ai.strafe; inp.my = Math.cos(a) * f.ai.strafe; }
-  inp.a = d < def.atkRange;
+  inp.a = d < (f.def.id === 'burnA' && f.form === 'beast' ? 470 : def.atkRange);
   for (const k of ['z', 'x', 'c', 'v']) {
     if (f.cd[k] > 0 || Math.random() > dt * .9) continue;
     if (k === 'v' && f.def.id === 'silent' && d > 250) continue;
@@ -2111,7 +2277,9 @@ function aiInput(f) {
     if (f.def.id === 'burn' && f.undy > 0 && k === 'z') continue;
     if (f.def.id === 'pva' && ((k === 'z' && f.ldom) || (k === 'c' && d > 700) || (k === 'x' && d > 800) || (k === 'v' && d > 1200))) continue;
     if (f.def.id === 'pv' && k === 'c' && !(f.st.lock > 0 || f.st.ctl > 0 || f.st.silence > 0 || B.mind || foe(f).veil || (foe(f).cast && foe(f).cast.type))) continue;
-    if (k === 'v' && f.form !== 'base' && f.form !== 'hour') continue;
+    if (k === 'v' && f.form !== 'base' && f.form !== 'hour' && f.form !== 'beast') continue;
+    if (f.def.id === 'burnA' && f.form === 'beast' && !(f.boss > 0) && ((k === 'z' && d > 500) || (k === 'x' && d > 700) || (k === 'v' && d > 900))) continue;
+    if (f.def.id === 'burnA' && ((k === 'x' && d > 650) || (k === 'c' && d > 700) || (k === 'z' && d > 1100) || (k === 'v' && f.boss > 0))) continue;
     if (k === 'v' && f.cast) continue;
     if (f.def.id === 'sugar' && (k === 'c' || k === 'v') && f.hp / f.max > .7 && f.shield / f.shieldMax > .6) continue;
     inp.keys.push(k);
@@ -2162,7 +2330,7 @@ function updFighter(f, dt) {
   for (const k of ['slow', 'silence', 'stun', 'charm', 'inv', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl', 'lightBuff']) f.st[k] = Math.max(0, f.st[k] - dt);
   if (f.permRev) f.st.rev = Math.max(f.st.rev, .2); if (f.permSlow && f.st.slow < .2) slowOn(f, .2, .65);
   f.flash = Math.max(0, f.flash - dt); f.drT = Math.max(0, f.drT - dt);
-  if (f.form !== 'base' && f.form !== 'hour' && !f.script) { f.formT -= dt; if (f.formT <= 0) { revertForm(f); toast(f, '변신 종료'); } }
+  if (f.form !== 'base' && f.form !== 'hour' && f.form !== 'beast' && !f.script) { f.formT -= dt; if (f.formT <= 0) { revertForm(f); toast(f, '변신 종료'); } }
   let inp = readInput(f); f.last = { mx: inp.mx, my: inp.my };
   if (f.st.ctl > 0 && f.ctlBy && f.ctlBy.hp > 0) { const s = f.ctlBy.last || { mx: 0, my: 0 }; inp = { mx: s.mx, my: s.my, a: false, keys: f.def.id === 'pv' ? inp.keys.filter(k => k === 'c') : [] }; }
   if (f.st.rev > 0) { inp = { ...inp, mx: -inp.mx, my: -inp.my }; }
@@ -2236,7 +2404,7 @@ function update(dt) {
   updBush();
   for (const m of B.fighters) if (m.legion && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
   if (B.fighters.some(m => m.gone && m.legion)) { B.fighters.filter(m => m.gone && m.legion).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && m.legion)); }
-  updFxm(dt); updLdoms(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
+  updFxm(dt); updFire(dt); updLdoms(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   if (B.explore) { updExplore(dt); return; }
@@ -2356,7 +2524,7 @@ function cleanup() {
   B.fighters.forEach(f => { if (f.drain) endDrain(f); if (f.ldom) endLdom(f, true); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
   B.lakes.forEach(removeLake); B.hexes.forEach(removeHex); B.fighters.forEach(f => f.veil && world.scene.remove(f.veil.group)); B.angels.forEach(a => world.scene.remove(a.g)); B.zones.forEach(z => z.mesh && world.scene.remove(z.mesh));
   B.fighters.forEach(f => { if (f.cast && f.cast.group) world.scene.remove(f.cast.group); }); world.setParadise(false);
-  B.extra.forEach(m => world.scene.remove(m)); ui.glass(false); world.setAbyss(false); if (sealBtn) sealBtn.style.display = 'none';
+  B.extra.forEach(m => world.scene.remove(m)); B.fire = null; ui.glass(false); world.setAbyss(false); if (sealBtn) sealBtn.style.display = 'none';
   if (B.cut) { if (B.cut.moon) world.scene.remove(B.cut.moon.group); (B.cut.eyes || []).forEach(e => world.scene.remove(e)); if (B.cut.kind === 'burn') B.fighters.forEach(f => { f.root.visible = true; }); }
   B.barriers.forEach(removeBarrier); B.lights.forEach(removeLight); if (B.storm) endStorm(true); world.setStorm(false);
   [...vfx.items].forEach(i => vfx.drop(i));

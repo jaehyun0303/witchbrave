@@ -72,7 +72,7 @@ export function update(B, camera, renderer, dt) {
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
     p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
-    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'hour' ? ' [침묵의 때]' : f.sealSoul ? ' [영혼]' : '';
+    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : ' [괴수화]') : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
     p.slots.forEach(s => {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
@@ -89,7 +89,7 @@ export function update(B, camera, renderer, dt) {
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
     let ic = ''; const s = f.st;
-    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
+    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (f.mflame) ic += '🔥'; if (f.noHeal > 0) ic += '💔'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
     t.ic.textContent = ic;
   }
   for (let i = pops.length - 1; i >= 0; i--) {
