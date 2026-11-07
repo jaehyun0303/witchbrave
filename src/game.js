@@ -2327,6 +2327,12 @@ function updMystic(dt) {
   const ss = B.mst || [];
   for (const s of ss) {
     s.t += dt; s.m.children.forEach((c, i) => c.rotation.y += dt * (5 + i * 1.5));
+    {   // 토네이도처럼 돌아다닌다: 불규칙하게 방향을 틀면서 상대 쪽으로 어슬렁어슬렁 다가간다
+      const tg = s.owner.hp > 0 ? foe(s.owner) : null; if (tg && tg !== B.ghost) { const want = Math.atan2(tg.y - s.y, tg.x - s.x), df = Math.atan2(Math.sin(want - s.ha), Math.cos(want - s.ha)); s.ha += clamp(df, -1, 1) * dt * 1.1; }
+      s.ha += rnd(-1, 1) * dt * 5; let nx = s.x + Math.cos(s.ha) * s.sp * dt, ny = s.y + Math.sin(s.ha) * s.sp * dt;
+      if (nx < PAD || nx > W - PAD) { s.ha = Math.PI - s.ha; nx = clamp(nx, PAD, W - PAD); } if (ny < PAD || ny > H - PAD) { s.ha = -s.ha; ny = clamp(ny, PAD, H - PAD); }
+      s.x = nx; s.y = ny; s.m.position.copy(P3(s)); s.m.rotation.z = Math.sin(s.t * 3 + s.ha) * .08; s.m.rotation.x = Math.cos(s.t * 2.3 + s.ha) * .08;
+    }
     const p = P3(s); if (Math.random() < .8) { const a = rnd(0, 6.283), rr = rnd(.2, 1) * s.r * S; vfx.emit('glow', { x: p.x + Math.cos(a) * rr, y: rnd(.3, 4), z: p.z + Math.sin(a) * rr, vx: -Math.sin(a) * 4, vz: Math.cos(a) * 4, vy: rnd(1, 4), life: .7, s0: .8, s1: 0, c0: 0xffffff, c1: 0xd8d0b8, a: .5, drag: 0 }); }
     s.tick -= dt;
     if (s.tick <= 0 && s.t < s.dur && s.owner.hp > 0) { s.tick = .5; for (const o of B.fighters) if (o !== s.owner && !ally(s.owner, o) && o.hp > 0 && realmOf(o) === (s.realm || 0) && Math.hypot(o.x - s.x, o.y - s.y) < s.r + o.r) { hurt(s.owner, o, 150, { quiet: true, field: true }); ui.pop(P3(o, 2.8), Math.round(150 * dmgMul(s.owner) * (1 - defRed(o))), '#f4eed8'); } }
@@ -2349,7 +2355,7 @@ CHARS.mystic = {
         setAnim(f, 'cast', .5); const c = clampRange(f, p, 700); B.mst = B.mst || [];
         for (let i = 0; i < 5; i++) {
           const a = i / 5 * 6.283 + rnd(-.3, .3), d = i === 0 ? 0 : rnd(130, 300), x = clamp(c.x + Math.cos(a) * d, PAD, W - PAD), y = clamp(c.y + Math.sin(a) * d, PAD, H - PAD), m = stormMesh(150 * S);
-          m.position.copy(P3({ x, y })); addExtra(m); B.mst.push({ owner: f, x, y, r: 150, t: 0, dur: 10, tick: 0, m, realm: f.realm });
+          m.position.copy(P3({ x, y })); addExtra(m); B.mst.push({ owner: f, x, y, r: 150, t: 0, dur: 10, tick: 0, m, realm: f.realm, ha: rnd(0, 6.283), sp: rnd(110, 170) });
           vfx.ring(P3({ x, y }), { r0: .5, r1: 150 * S, dur: .5, color: 0xffffff });
         }
       } },
