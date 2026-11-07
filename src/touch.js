@@ -32,6 +32,8 @@ function css() {
   @media (orientation:portrait){.touchdev #trot{display:flex}}
   .touchdev .skills{display:none!important}
   .touchdev,.touchdev body{touch-action:none;overscroll-behavior:none}
+  .touchdev,.touchdev *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #result,#result button{touch-action:manipulation}
   `;
   document.head.appendChild(s);
 }
@@ -66,6 +68,7 @@ export function initTouch(a) {
   const end = e => { if (e.pointerId !== pid) return; pid = null; TOUCH.mx = TOUCH.my = 0; base.style.display = 'none'; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
   addEventListener('contextmenu', e => isTouch && e.preventDefault());
+  addEventListener('wb-result', () => showTouch(false));   // 결과창이 뜨면 터치 오버레이를 꺼서 '돌아가기' 버튼이 눌리게
   document.addEventListener('gesturestart', e => e.preventDefault());
 }
 

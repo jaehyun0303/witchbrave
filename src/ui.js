@@ -125,7 +125,7 @@ export function dim(n) {   // 암흑의 기운: 중첩(0~3)마다 시야가 좁�
   e.style.background = n ? `radial-gradient(circle at 50% 55%, rgba(0,0,0,0) ${r[0]}vmin, rgba(2,0,8,.96) ${r[1]}vmin)` : 'none';
 }
 export function vignette(on) { $('#game').classList.toggle('vig', on); }
-export function result(text, sub) { $('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
+export function result(text, sub) { try { dispatchEvent(new Event('wb-result')); } catch (_) {}$('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
 export function hideHud() { hud = null; $('#mindtimer').style.display = 'none'; }
 
 /* 유리 깨짐 연출 (리치드래곤 궁극기) */

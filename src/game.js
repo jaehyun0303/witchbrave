@@ -38,7 +38,7 @@ let B = null, world, vfx, camera, canvas;
 const foe = f => { let best = null, bd = 1e18; for (const o of B.fighters) { if (o === f || o.hp <= 0 || o.nofoe || ally(o, f) || realmOf(o) !== realmOf(f)) continue; const d = (o.x - f.x) ** 2 + (o.y - f.y) ** 2; if (d < bd) { bd = d; best = o; } } return best || B.fighters.find(o => o !== f && realmOf(o) === realmOf(f)) || B.ghost; };
 
 /* ================= 데미지 / 상태 ================= */
-const dmgMul = f => (f.pm || 1) * (f.st.lightBuff > 0 ? 1.25 : 1) * (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1) * (f.form === 'hour' ? 1.3 : 1) * (f.sealSoul ? .5 : 1) * (f.bigSword > 0 ? 3 : 1);
+const dmgMul = f => (f.pm || 1) * (f.st.lightBuff > 0 ? 1.25 : 1) * (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1) * (f.form === 'hour' ? 1.3 : 1) * (f.sealSoul ? .5 : 1) * (f.bigSword > 0 ? 3 : 1) * (1 - Math.min(.5, (f.voidP || 0) * .1));
 const defRed = f => Math.min(.95, (f.mindBuff ? .05 : 0) + (f.giant > 0 ? .35 : 0) + (f.def.id === 'burnA' && f.form === 'beast' ? .55 + (f.molt || 0) * .01 : 0));   // 불지네 괴수화: 받는 피해 45% (필멸의 탈피 스택마다 1%p 추가 감소)
 const spdMul = f => (f.spdBoost || 1) * (f.mindBuff ? 1.15 : 1) * (f.form === 'dragon' ? 1.1 : 1);
 const toast = (f, t) => { if (f.ctrl.kind !== 'ai') ui.toast(t); };
@@ -55,6 +55,7 @@ function hurt(src, t, n, o = {}) {
   if (src && src !== t && B.barriers.length && inBarrier(src, t)) { if (!o.quiet) ui.pop(P3(t, 2.6), '막힘!', '#fff3b0'); return; }
   let d = n * (src ? dmgMul(src) : 1) * (1 - defRed(t));
   if (t.drT > 0) d *= 1 - t.drV;
+  if (t.cocoon) { const c = t.cocoon; c.hp -= d; t.cmb = B.time; if (src && src !== t) src.cmb = B.time; ui.pop(P3(t, 2.6), '🕸 ' + Math.round(d), '#e8e8f0'); c.mesh.scale.setScalar(1.12); setTimeout(() => c.mesh && c.mesh.scale.setScalar(1), 80); if (c.hp <= 0) cocoonBreak(t); return; }
   const dk = src && src !== t && src.def.id === 'dark' && !src.sealSoul;   // 어둠마녀 패시브: 보호막 흡수 20% (적중마다, 지속 피해 제외) + 피해 10% 관통
   if (dk && t.shield > 0 && !o.field) { const ab = t.shield * .2; t.shield -= ab; src.shield += ab; src.shieldMax = Math.max(src.shieldMax, src.shield); if (ab >= 1) ui.pop(P3(src, 3.2), '🛡 +' + Math.round(ab), '#ff8a98'); }
   const pierce = dk ? d * .1 : 0; if (dk) d -= pierce;
@@ -122,6 +123,9 @@ function projVisual(p) {
     fl.add(new THREE.Mesh(new THREE.SphereGeometry(.35, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe066 })));
     fl.scale.setScalar(p.r * S * 3.2); g.add(fl); g.userData.mesh = fl; glow.scale.setScalar(p.r * S * 11);
   }
+  if (p.kind === 'flour') {   // 미스틱플라워의 밀가루 뭉치
+    const fm = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xfffaf0, roughness: 1, emissive: 0xcfc8b0, emissiveIntensity: .35, flatShading: true })); fm.scale.setScalar(p.r * S * 2.2); g.add(fm); g.userData.mesh = fm; glow.scale.setScalar(p.r * S * 8);
+  }
   if (p.kind === 'axe') {   // 버닝스파이스의 도끼: 불타며 회전
     const ax = new THREE.Group(), hm = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: .6 }), bm = new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0xff5a10, emissiveIntensity: 1.4, metalness: .5, roughness: .3 });
     ax.add(new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 2.8, 8), hm));
@@ -149,6 +153,7 @@ function updProjs(dt) {
       if (p.kind === 'heart') { p.vis.userData.mesh.rotation.y += dt * 8; p.vis.userData.mesh.rotation.z = Math.sin(B.time * 14) * .3; }
       if (p.kind === 'axe') p.vis.userData.mesh.rotation.x += dt * 20;
       if (p.kind === 'flower') p.vis.userData.mesh.rotation.z += dt * 9;
+      if (p.kind === 'flour') { p.vis.userData.mesh.rotation.x += dt * 7; p.vis.userData.mesh.rotation.y += dt * 5; }
       if (p.kind === 'wave') p.vis.userData.mesh.material.opacity = .9 + Math.sin(B.time * 30) * .1;
     }
     // 궤적 파티클
@@ -213,6 +218,7 @@ function updZones(dt) {
       else erupt(P3(z), z.r * S, z.color);
       if (z.fancy) { const c = P3(z); erupt(c, z.r * S * 1.4, z.color, 22); erupt(c, z.r * S * .8, 0xffffff, 28); for (let i = 0; i < 3; i++) vfx.ring(c, { r0: .5, r1: z.r * S * (2 + i), dur: .6 + i * .2, color: i ? 0xff8080 : 0xff2438 }); vfx.burst('spark', c.clone().setY(1), 120, { speed: 8, speed2: 26, life: .9, life2: 1.8, size: .8, c0: 0xffffff, c1: 0xff2030, grav: 5 }); ui.flash('#ff2030', .5, .4); shake(.9, .5); }
       for (const t of B.fighters) if (t !== z.owner && realmOf(t) === realmOf(z) && Math.hypot(t.x - z.x, t.y - z.y) < z.r + t.r) { if (inBarrier(z.owner, t)) { hurt(z.owner, t, z.dmg); continue; } hurt(z.owner, t, z.dmg); z.onHit && z.onHit(t); }
+      if (z.onSelf && z.owner.hp > 0 && realmOf(z.owner) === realmOf(z) && Math.hypot(z.owner.x - z.x, z.owner.y - z.y) < z.r + z.owner.r) z.onSelf(z.owner);
     }
   }
   B.zones = B.zones.filter(z => z.t < z.delay + .3);
@@ -262,7 +268,7 @@ function updField(f, dt) {
 function startMind(f) {
   if (B.seal || B.abyss || B.lult) return false;
   const e = foe(f);
-  if (e !== B.ghost && immune(e) && (e.def.id === 'pva' || inLdom(e))) { ui.pop(P3(e, 3.4), '저항!', '#fff0a8'); toast(f, '각성 퓨어바닐라 쿠키와 빛의 아공간 안의 아군에게는 정신계 공격이 통하지 않습니다'); return false; }
+  if (e !== B.ghost && immune(e) && (e.def.id === 'pva' || e.def.id === 'mystic' || inLdom(e))) { ui.pop(P3(e, 3.4), '저항!', '#fff0a8'); toast(f, '각성 퓨어바닐라 쿠키와 빛의 아공간 안의 아군에게는 정신계 공격이 통하지 않습니다'); return false; }
   if (inBarrier(f, e)) { ui.pop(P3(e, 3.4), '장막이 막았다!', '#fff3b0'); return false; }
   B.barriers.forEach(removeBarrier); B.barriers = [];
   B.mind = { t: 15, f, ret: B.fighters.map(o => ({ x: o.x, y: o.y })), objs: B.objs };
@@ -561,7 +567,7 @@ CHARS.shadow = {
 /* ===== 쉐도우밀크 ===== */
 const SHB = 0x3a7bff;
 const inLdom = t => !!B && B.fighters.some(p => p.ldom && p.hp > 0 && realmOf(p) === realmOf(t) && (t === p || ally(p, t)) && Math.hypot(t.x - p.ldom.x, t.y - p.ldom.y) < p.ldom.r + t.r);
-const immune = t => t.def.id === 'pva' || inLdom(t) || (!t.mindOpen && (t.def.id === 'silent' || t.form === 'dragon' || !!t.def.spirit));
+const immune = t => t.def.id === 'pva' || t.def.id === 'mystic' || inLdom(t) || (!t.mindOpen && (t.def.id === 'silent' || t.form === 'dragon' || !!t.def.spirit));
 const pwr = f => f.soul ? .25 : 1;
 function buildEye(sc) {
   const g = new THREE.Group();
@@ -1501,7 +1507,7 @@ function burnOn(t, src, dur = 4, dps = 300) {   // 화상: 0.5초마다 도트 �
 function act(f, dur, upd, end) { f.script = { t: 0, steps: [], end: dur, onEnd: () => { if (f.act) f.act.upd(1, 0); f.act = null; end && end(); } }; f.act = { t: 0, dur, upd }; }
 function updCommon(f, dt) {   // 전 캐릭터 공통: 화상, 불사, 거대화, 수명, 자연 회복
   if (f.hp <= 0) { f.burn = null; return; }
-  if (f.def.id === 'pva') { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) f.st[k] = 0; f.burn = null; f.mflame = null; f.noHeal = 0; f.mindBuff = false; }   // 각성 퓨어바닐라: 디버프 면역
+  if (f.def.id === 'pva' || f.def.id === 'mystic') { for (const k of ['slow', 'silence', 'stun', 'charm', 'lock', 'cdfreeze', 'knock', 'rev', 'ctl']) f.st[k] = 0; f.burn = null; f.mflame = null; f.noHeal = 0; f.mindBuff = false; }   // 각성 퓨어바닐라: 디버프 면역
   if (f.noHeal > 0) { f.noHeal -= dt; if (f.hpPrev !== undefined && f.hp > f.hpPrev) f.hp = f.hpPrev; }   // 회복 불가: 늘어난 체력은 되돌린다
   f.hpPrev = f.hp;
   if (f.mflame) {   // 필멸의 불꽃: 초당 500, 퓨어바닐라의 버프(마법의 빛)나 미스틱플라워의 힐(f.mysticHeal)이 있어야만 해제
@@ -1512,7 +1518,8 @@ function updCommon(f, dt) {   // 전 캐릭터 공통: 화상, 불사, 거대화
   }
   if (f.boss > 0) { f.boss -= dt; if (f.boss <= 0) endBoss(f); }
   if (f.spdBoostT > 0) { f.spdBoostT -= dt; if (f.spdBoostT <= 0) { f.spdBoostT = 0; f.spdBoost = 1; } }
-  if (f.dim > 0) { f.dim -= dt; if (f.dim <= 0) f.dimN = 0; }   // 암흑의 기운: 시야 감소 (3중첩, 갱신형 10초)
+  if (f.def.id === 'mystic') { f.dim = 0; f.dimN = 0; }   // 미스틱플라워: 모든 디버프 면역 (시야 디버프 포함)
+  if (f.dim > 0) { f.dim -= dt; if (f.dim <= 0) { f.dimN = Math.max(0, (f.dimN || 0) - 1); f.dim = f.dimN > 0 ? 5 : 0; } }   // 암흑의 기운: 3중첩, 마지막 적중 후 5초마다 1중첩씩 풀린다
   if (f === B.fighters[0]) ui.dim(f.dim > 0 ? f.dimN || 0 : 0);
   if (f.bigSword > 0) { f.bigSword -= dt; if (f.bigSword <= 0) { f.bigSword = 0; if (f.bladeM) { f.root.remove(f.bladeM); f.bladeM = null; } ui.pop(P3(f, 4), '검 크기 원래대로', '#c8b0ff'); } else if (f.bladeM) { const k = Math.min(1, (12 - f.bigSword) / .5); f.bladeM.scale.setScalar(.2 + .7 * ease.out(k)); f.bladeM.rotation.y += dt * 1.5; } }
   if (f.undy > 0) {
@@ -1701,7 +1708,7 @@ function updBurnCut(dt) {
 }
 /* ===== 각성 버닝스파이스 쿠키 (HP 40000, 보호막 1000, 패시브: 죽으면 괴수화 부활 HP 12000) ===== */
 function mflameOn(t, src, n = 0) {   // 필멸의 불꽃: 초당 500, 퓨어바닐라의 버프/미스틱플라워의 힐로만 해제. n = 부여하는 필멸 스택 수 (괴수화 스킬: 평타1 Z3 X4 C5)
-  if (!t || t.hp <= 0 || t.undy > 0 || t.def.id === 'pva' || inLdom(t)) return;
+  if (!t || t.hp <= 0 || t.undy > 0 || t.def.id === 'pva' || t.def.id === 'mystic' || (B.fighters.some(m => m.def.id === 'mystic' && m.hp > 0 && m.aura && (m === t || ally(m, t)) && Math.hypot(t.x - m.x, t.y - m.y) < 380 + t.r)) || inLdom(t)) return;
   const dps = 500 * (src.boss > 0 ? 3 : 1);
   if (!t.mflame) { t.mflame = { src, dps, tick: .5, stacks: 0 }; ui.pop(P3(t, 3.4), '🔥 필멸의 불꽃', '#ff3a20', true); } else { t.mflame.dps = Math.max(t.mflame.dps, dps); t.mflame.src = src; }
   if (n > 0) { t.mflame.stacks = Math.min(99, (t.mflame.stacks || 0) + n); ui.pop(P3(t, 3.0), '필멸 ×' + t.mflame.stacks, '#ff9a60'); }
@@ -2122,7 +2129,7 @@ CHARS.dkk = {
     base: {
       a: { name: '암흑 베기', cd: .7, desc: '검을 휘두른다 400. 맞을 때마다 암흑의 기운으로 시야가 좁아짐 (3중첩, 갱신 10초)', use(f) {
         setAnim(f, 'slash', .3); const hits = swing(f, 190 * (f.area || 1), 1.0, 400, DKK);
-        for (const t of hits) { t.dim = 10; t.dimN = Math.min(3, (t.dimN || 0) + 1); ui.pop(P3(t, 3.4), '🌑 시야 ' + t.dimN + '/3', '#b08cff'); }
+        for (const t of hits) { if (t.def.id === 'mystic' || (t.team !== undefined && f.team === t.team)) continue; t.dim = 5; t.dimN = Math.min(3, (t.dimN || 0) + 1); ui.pop(P3(t, 3.4), '🌑 시야 ' + t.dimN + '/3', '#b08cff'); }
       } },
       z: { name: '검 거대화', cd: 30, desc: '12초 동안 검이 거대해지며 모든 데미지가 3배', use(f) {
         setAnim(f, 'cast', .6); f.pose = 'raise'; f.bigSword = 12; if (f.bladeM) f.root.remove(f.bladeM); f.bladeM = buildBlade(); f.bladeM.scale.setScalar(.2); f.root.add(f.bladeM);
@@ -2197,7 +2204,166 @@ CHARS.brave = {
     }
   }
 };
-const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv', 'burn', 'lily', 'dkk', 'brave'];
+/* ===== 미스틱플라워 쿠키 (비스트, HP 19500) ===== */
+const MYS = 0xf0e6c8, LOTUS = 0xffd84a, MYS_DEB = ['slow', 'silence', 'stun', 'lock', 'cdfreeze', 'knock', 'rev'];
+function mHeal(o, n, quiet) {   // 미스틱플라워의 치유: 회복 불가면 무시, 필멸의 불꽃 해제 훅(mysticHeal)
+  if (o.hp <= 0 || o.noHeal > 0) return; const h = Math.min(o.max - o.hp, n); o.hp += h; o.mysticHeal = Math.max(o.mysticHeal || 0, .3);
+  if (!quiet && h >= 1) ui.pop(P3(o, 3.4), '+' + Math.round(h), '#7dff9b', h >= 800);
+}
+function mAllies(f) { return [f, ...B.fighters.filter(o => o !== f && ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f))]; }
+function voidOn(t, src, n = 1) {   // 허무 스택. 영역(찜기) 안에서 3번 쌓일 때마다 허무의 빛이 터진다
+  if (t.hp <= 0 || t === src) return; t.void = (t.void || 0) + n; ui.pop(P3(t, 4.2), '허무 ×' + t.void, '#f4eed8');
+  const d = src.vdom; if (d && d.t < d.dur && Math.hypot(t.x - d.x, t.y - d.y) < d.r + t.r) { d.stk += n; while (d.stk >= 3) { d.stk -= 3; voidPulse(src, d); } }
+}
+function voidPulse(f, d) {
+  const p = P3(d); vfx.column(p, { r: d.r * S * .5, h: 40, dur: 1, color: LOTUS, alpha: .75 }); vfx.column(p, { r: d.r * S * .25, h: 46, dur: .8, color: 0xffffff, alpha: .9 });
+  vfx.ring(p, { r0: 1, r1: d.r * S * 1.2, dur: .8, color: LOTUS }); vfx.flash(p.clone().setY(2), { size: d.r * S * 3, color: LOTUS, dur: .6, grow: true }); ui.flash('#ffe066', .6, .45); shake(.7, .4);
+  for (const o of mAllies(f)) { mHeal(o, 1000); cleanse(o); o.burn = null; }
+  for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f) && Math.hypot(o.x - d.x, o.y - d.y) < d.r + o.r) {
+    o.voidP = (o.voidP || 0) + 1; o.max = Math.max(1, o.max - 500); o.hp = Math.min(o.hp, o.max);
+    ui.pop(P3(o, 4.6), `🕳 허무! 최대 체력 -500 · 스킬 지연 · 피해 감소 (${o.voidP})`, '#f4eed8', true);
+  }
+  ui.pop(P3(f, 4.4), '✨ 허무의 빛! +1000 · 디버프 해제', '#fff0a8', true);
+}
+function lotusFx(x, y, r, delay) {   // 노란 연꽃이 피어나며 터진다
+  const R = r * S, g = new THREE.Group(), mats = [];
+  for (let l = 0; l < 3; l++) for (let i = 0; i < 10; i++) {
+    const m = new THREE.MeshBasicMaterial({ color: l === 2 ? 0xffffff : LOTUS, transparent: true, opacity: .8, depthWrite: false, blending: THREE.AdditiveBlending }); mats.push(m);
+    const pv = new THREE.Group(), pt = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), m); pt.scale.set(R * (.16 - l * .03), R * .05, R * (.44 - l * .1)); pt.position.set(0, R * (.1 + l * .08), R * (.42 - l * .09)); pt.rotation.x = -(.35 + l * .45); pv.add(pt); pv.rotation.y = i / 10 * 6.283 + l * .31; g.add(pv);
+  }
+  g.position.copy(P3({ x, y })); g.scale.setScalar(.001);
+  addFxm(g, delay + 1.1, (u, m, t) => { const k = t < delay ? .001 : ease.out(Math.min(1, (t - delay) / .35)); m.scale.setScalar(k); m.rotation.y += .01; const fade = t < delay + .45 ? 1 : Math.max(0, 1 - (t - delay - .45) / .65); mats.forEach(q => q.opacity = .8 * fade); });
+}
+function stormMesh(R) {
+  const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .32, depthWrite: false, side: THREE.DoubleSide });
+  for (let i = 0; i < 6; i++) { const h = R * .55, w = new THREE.Mesh(new THREE.CylinderGeometry(R * (.35 + i * .13), R * (.3 + i * .12), h, 20, 1, true), m); w.position.y = h * (i + .5); g.add(w); }
+  return g;
+}
+function buildSteamer(R) {   // 만두 찜기 모양 연꽃
+  const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0xc99a5b, roughness: .8, side: THREE.DoubleSide, transparent: true, opacity: .5 }), dark = new THREE.MeshStandardMaterial({ color: 0x7a5530, roughness: .7 });
+  const h = R * .15; for (let i = 0; i < 3; i++) { const w = new THREE.Mesh(new THREE.CylinderGeometry(R, R * .97, h, 40, 1, true), wood); w.position.y = h * (i + .5); g.add(w); const b = new THREE.Mesh(new THREE.TorusGeometry(R, R * .012, 6, 56), dark); b.rotation.x = Math.PI / 2; b.position.y = h * (i + 1); g.add(b); }
+  const pm = new THREE.MeshStandardMaterial({ color: LOTUS, emissive: 0xffb800, emissiveIntensity: .8, roughness: .5 }), pets = [];
+  for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283, pv = new THREE.Group(), pt = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), pm); pt.scale.set(R * .09, R * .22, R * .03); pt.position.set(0, R * .2, 0); pt.rotation.x = -.35; pv.add(pt); pv.position.set(Math.cos(a) * R, h * 3, Math.sin(a) * R); pv.rotation.y = -a + Math.PI / 2; g.add(pv); pets.push(pv); }
+  g.userData.pets = pets; return g;
+}
+function mysAura(f) {   // 따라다니는 면역 영역
+  const A = 380, p = P3(f); if (!f.aura) f.aura = { ring: vfx.decal(p, { tex: 'ring', r: A * S, color: LOTUS, alpha: .55, y: .06 }), rune: vfx.decal(p, { tex: 'rune', r: A * S * .9, color: 0xfff2a0, alpha: .26, spin: .4, y: .05 }) };
+  for (const it of [f.aura.ring, f.aura.rune]) it.obj.position.set(p.x, it.obj.position.y, p.z);
+  for (const o of mAllies(f)) if (o !== f && Math.hypot(o.x - f.x, o.y - f.y) < A + o.r) { for (const k of MYS_DEB) o.st[k] = 0; o.burn = null; o.dim = 0; o.dimN = 0; o.mysticHeal = Math.max(o.mysticHeal || 0, .15); }
+}
+function mysAuraOff(f) { if (f.aura) { vfx.remove(f.aura.ring); vfx.remove(f.aura.rune); f.aura = null; } }
+function cocoonBreak(f) {
+  const c = f.cocoon; if (!c) return; f.cocoon = null; f.root.remove(c.mesh);
+  const p = P3(f, 1); vfx.burst('spark', p, 60, { speed: 6, speed2: 16, life: .8, size: .6, c0: 0xffffff, c1: 0xffe066, grav: 4 }); vfx.ring(P3(f), { r0: .5, r1: 9, dur: .7, color: LOTUS }); shake(.6, .4);
+  for (const o of mAllies(f)) mHeal(o, 2000);
+  B.fighters.forEach(m => { if (m.legion && m.legionOf === f && m.def.id === 'mob_spider' && m.hp > 0) m.hp = 0; });
+  const a = f.face, m = addMinion('mob_spider', clamp(f.x + Math.cos(a) * 200, PAD, W - PAD), clamp(f.y + Math.sin(a) * 200, PAD, H - PAD), { hp: 7000, pm: f.pm || 1, realm: f.realm, big: 1.7 });
+  m.team = f.team; m.legion = true; m.legionOf = f; m.face = a; ui.pop(P3(f, 4.4), '🕷 고치 파괴! 거대 거미 출현', '#f4eed8', true);
+}
+function buildCocoon() {
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xf1f0f6, roughness: .9, emissive: 0x6a6a80, emissiveIntensity: .25 }), web = new THREE.MeshBasicMaterial({ color: 0xb8b8c8 });
+  const b = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), m); b.scale.set(.95, 1.5, .95); b.position.y = 1.5; g.add(b);
+  for (let i = 0; i < 5; i++) { const t = new THREE.Mesh(new THREE.TorusGeometry(.95 * Math.sqrt(1 - ((i - 2) * .32) ** 2), .03, 5, 24), web); t.rotation.x = Math.PI / 2; t.position.y = 1.5 + (i - 2) * .5; g.add(t); }
+  g.position.set(0, 0, 1.9); return g;
+}
+function buildSpider() {
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0x3b2a4d, roughness: .6, emissive: 0x1a0f26, emissiveIntensity: .5, flatShading: true }), red = new THREE.MeshBasicMaterial({ color: 0xff4060 });
+  const ab = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), m); ab.scale.set(1.1, .95, 1.5); ab.position.set(0, 1.5, -.9); g.add(ab);
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(.7, 12, 10), m); hd.position.set(0, 1.3, .9); g.add(hd);
+  for (let i = 0; i < 4; i++) { const e = new THREE.Mesh(new THREE.SphereGeometry(.1, 6, 6), red); e.position.set((i % 2 ? .22 : -.22) * (i > 1 ? 1.6 : 1), 1.5 + (i > 1 ? .12 : 0), 1.5); g.add(e); }
+  const legs = [];
+  for (const s of [1, -1]) for (let i = 0; i < 4; i++) {
+    const pv = new THREE.Group(); pv.position.set(0, 1.3, .6 - i * .5); pv.rotation.y = s > 0 ? -(i - 1.5) * .35 : Math.PI + (i - 1.5) * .35;
+    const u = new THREE.Mesh(new THREE.CylinderGeometry(.09, .07, 1.7, 6), m); u.rotation.z = Math.PI / 2 - .8; u.position.set(.7, .55, 0);
+    const l = new THREE.Mesh(new THREE.CylinderGeometry(.07, .03, 1.9, 6), m); l.rotation.z = .25; l.position.set(1.65, -.25, 0);
+    pv.add(u, l); g.add(pv); legs.push(pv);
+  }
+  g.userData.legs = legs; return g;
+}
+CHARS.mob_spider = mobDef('mob_spider', '거대 거미', 0x3b2a4d, 7000, '미스틱플라워의 소환수 · 근접', {
+  a: { name: '독니 물기', cd: 1, desc: '근접 300', use(f) { setAnim(f, 'slash', .25); swing(f, 170, 1.1, 300, 0xd08cff); } },
+}, { range: 170, pref: 100 });
+CHARS.mob_spider.spider = true;
+function startSteamer(f) {   // V: 연꽃 영역(만두찜기)
+  if (f.vdom) { toast(f, '이미 연꽃 영역이 전개되어 있습니다'); return false; }
+  if (f.team === undefined) f.team = 100 + B.fighters.indexOf(f);
+  setAnim(f, 'cast', .7);
+  const d = f.vdom = { x: f.x, y: f.y, r: 430, t: 0, dur: 30, stk: 0, tick: .5, trap: new Set() }, p = P3(d), R = d.r * S;
+  for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f) && Math.hypot(o.x - d.x, o.y - d.y) < d.r + o.r) d.trap.add(o);
+  d.g = buildSteamer(R); d.g.position.copy(p); addExtra(d.g);
+  d.rune = vfx.decal(p, { tex: 'rune', r: R, color: LOTUS, alpha: .3, spin: .2 }); d.ring = vfx.decal(p, { tex: 'ring', r: R, color: 0xffffff, alpha: .9, y: .07 });
+  vfx.ring(p, { r0: 1, r1: R * 1.2, dur: .9, color: LOTUS }); vfx.column(p, { r: R * .5, h: 30, dur: .9, color: LOTUS, alpha: .6 }); ui.flash('#ffe066', .6, .45); shake(.7, .4);
+  ui.pop(P3(f, 4.4), d.trap.size ? '🥟 연꽃 영역! 적이 갇혔다' : '🥟 연꽃 영역!', '#fff0a8', true);
+  toast(f, '연꽃 영역 30초: 적 초당 200 피해 / 아군 초당 200×적 수 회복 / 허무 3스택마다 허무의 빛');
+}
+function endSteamer(f, quiet) {
+  const d = f.vdom; if (!d) return; f.vdom = null; world.scene.remove(d.g); B.extra = B.extra.filter(m => m !== d.g); vfx.remove(d.rune); vfx.remove(d.ring);
+  if (!quiet && B) { vfx.ring(P3(d), { r0: 1, r1: d.r * S * .7, dur: .7, color: LOTUS }); ui.pop(P3(f, 4.2), '연꽃 영역 종료', '#fff0a8'); }
+}
+function updMystic(dt) {
+  for (const f of B.fighters) {
+    if (f.def.id !== 'mystic') continue;
+    if (f.hp <= 0) { mysAuraOff(f); if (f.vdom) endSteamer(f); continue; }
+    mysAura(f);
+    const d = f.vdom; if (!d) continue;
+    d.t += dt; const p = P3(d), R = d.r * S;
+    if (d.t >= d.dur) { endSteamer(f); continue; }
+    d.g.userData.pets.forEach((pv, i) => { pv.children[0].rotation.x = -.35 + Math.sin(d.t * 2 + i) * .12; });
+    if (Math.random() < .7) { const a = rnd(0, 6.283), rr = Math.sqrt(Math.random()) * R; vfx.emit('glow', { x: p.x + Math.cos(a) * rr, y: rnd(.3, 2), z: p.z + Math.sin(a) * rr, vy: rnd(3, 8), life: 1.2, s0: .9, s1: 1.8, c0: 0xffffff, c1: LOTUS, a: .4, drag: 0 }); }
+    let n = 0;
+    for (const o of B.fighters) {
+      if (o === f || ally(f, o) || o.hp <= 0 || realmOf(o) !== realmOf(f)) continue;
+      const dd = Math.hypot(o.x - d.x, o.y - d.y), a = Math.atan2(o.y - d.y, o.x - d.x);
+      if (d.trap.has(o)) { if (dd > d.r - o.r - 4) { const q = d.r - o.r - 4; o.x = d.x + Math.cos(a) * q; o.y = d.y + Math.sin(a) * q; } n++; }
+      else if (dd < d.r + o.r) { const q = d.r + o.r + 4; o.x = d.x + Math.cos(a) * q; o.y = d.y + Math.sin(a) * q; }
+    }
+    d.tick -= dt;
+    if (d.tick <= 0) {
+      d.tick = .5;
+      for (const o of d.trap) if (o.hp > 0) { hurt(f, o, 100, { quiet: true, field: true }); ui.pop(P3(o, 2.8), Math.round(100 * dmgMul(f) * (1 - defRed(o))), '#ffd84a'); }
+      if (n > 0) { const hv = 100 * n; for (const o of mAllies(f)) mHeal(o, hv, o !== f); }
+    }
+  }
+  const ss = B.mst || [];
+  for (const s of ss) {
+    s.t += dt; s.m.children.forEach((c, i) => c.rotation.y += dt * (5 + i * 1.5));
+    const p = P3(s); if (Math.random() < .8) { const a = rnd(0, 6.283), rr = rnd(.2, 1) * s.r * S; vfx.emit('glow', { x: p.x + Math.cos(a) * rr, y: rnd(.3, 4), z: p.z + Math.sin(a) * rr, vx: -Math.sin(a) * 4, vz: Math.cos(a) * 4, vy: rnd(1, 4), life: .7, s0: .8, s1: 0, c0: 0xffffff, c1: 0xd8d0b8, a: .5, drag: 0 }); }
+    s.tick -= dt;
+    if (s.tick <= 0 && s.t < s.dur && s.owner.hp > 0) { s.tick = .5; for (const o of B.fighters) if (o !== s.owner && !ally(s.owner, o) && o.hp > 0 && realmOf(o) === (s.realm || 0) && Math.hypot(o.x - s.x, o.y - s.y) < s.r + o.r) { hurt(s.owner, o, 150, { quiet: true, field: true }); ui.pop(P3(o, 2.8), Math.round(150 * dmgMul(s.owner) * (1 - defRed(o))), '#f4eed8'); } }
+    if (s.t >= s.dur || s.owner.hp <= 0) { world.scene.remove(s.m); B.extra = B.extra.filter(m => m !== s.m); s.dead = true; }
+  }
+  if (ss.length) B.mst = ss.filter(s => !s.dead);
+  for (const o of B.fighters) if (o.mysticHeal > 0) o.mysticHeal = Math.max(0, o.mysticHeal - dt);
+}
+CHARS.mystic = {
+  id: 'mystic', name: '미스틱플라워 쿠키', color: MYS, fx: LOTUS, cost: 1500, hp: 19500, pref: 4.2, atkRange: 600, aiPref: 380, tag: '허무 · 연꽃 · 밀가루 · 거미 · 만두찜기',
+  passive: '정신계·디버프에 면역입니다. 주변의 원형 영역은 따라다니며, 안의 아군은 (정신계 제외) 디버프에 면역입니다.',
+  skills: {
+    base: {
+      a: { name: '밀가루 뭉치', cd: .6, desc: '거대한 밀가루 뭉치를 발사한다 200. 맞으면 허무 스택 +1', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 780, r: 24, dmg: 200, color: 0xffffff, kind: 'flour', life: 1.3, onHit: t => voidOn(t, f, 1) }); } },
+      z: { name: '연꽃 폭발', cd: 12, desc: '노란 연꽃이 피며 펑 터진다 2000. 범위 안의 아군과 나를 1000 회복', use(f, p) {
+        setAnim(f, 'cast', .4); const q = clampRange(f, p, 650); lotusFx(q.x, q.y, 260, .7);
+        zone(f, { x: q.x, y: q.y, r: 260, delay: .7, dmg: 2000, color: LOTUS, onHit: t => { if (ally(f, t)) mHeal(t, 1000); }, onSelf: t => mHeal(t, 1000) });
+      } },
+      x: { name: '밀가루 폭풍', cd: 20, desc: '밀가루 폭풍 5개를 일으킨다. 각각 초당 300, 10초 유지', use(f, p) {
+        setAnim(f, 'cast', .5); const c = clampRange(f, p, 700); B.mst = B.mst || [];
+        for (let i = 0; i < 5; i++) {
+          const a = i / 5 * 6.283 + rnd(-.3, .3), d = i === 0 ? 0 : rnd(130, 300), x = clamp(c.x + Math.cos(a) * d, PAD, W - PAD), y = clamp(c.y + Math.sin(a) * d, PAD, H - PAD), m = stormMesh(150 * S);
+          m.position.copy(P3({ x, y })); addExtra(m); B.mst.push({ owner: f, x, y, r: 150, t: 0, dur: 10, tick: 0, m, realm: f.realm });
+          vfx.ring(P3({ x, y }), { r0: .5, r1: 150 * S, dur: .5, color: 0xffffff });
+        }
+      } },
+      c: { name: '거미 고치', cd: 35, desc: '앞에 체력 5000의 고치를 소환한다. 내가 맞으면 고치가 대신 피해를 입고, 부서지면 아군과 나를 2000 회복하고 체력 7000의 거대 거미가 나타난다', use(f) {
+        if (f.cocoon) { toast(f, '이미 고치가 있습니다'); return false; }
+        if (f.team === undefined) f.team = 100 + B.fighters.indexOf(f);
+        setAnim(f, 'cast', .5); const m = buildCocoon(); f.root.add(m); f.cocoon = { hp: 5000, max: 5000, mesh: m };
+        vfx.burst('spark', P3(f, 1.2), 30, { speed: 4, speed2: 10, life: .7, size: .5, c0: 0xffffff, c1: 0xb8b8c8 }); ui.pop(P3(f, 4), '🕸 거미 고치!', '#f4eed8', true);
+      } },
+      v: { name: '연꽃 영역', cd: 60, desc: '만두찜기 모양 연꽃 영역을 30초 전개. 안의 적은 갇혀 초당 200, 아군은 초당 200×(적 수) 회복. 허무 3스택마다 허무의 빛(아군 1000 회복·디버프 해제 / 적 스킬 지연·피해 감소·최대 체력 -500)', use(f) { return startSteamer(f); } },
+    }
+  }
+};
+const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv', 'burn', 'lily', 'dkk', 'brave', 'mystic'];
 
 /* ===== 리치드래곤 변신 ===== */
 function transform(f) {
@@ -2236,6 +2402,7 @@ function mkFighter(def, x, y, ctrl) {
   if (def.id === 'burnA') { f.rigB = buildCookie(Object.assign({}, def, { id: 'burnB' })); f.rigB.root.visible = false; f.root.add(f.rigB.root); }   // 괴수화(불지네) 모델
   if (def.dragon) { f.drg = buildDragon(); f.drg.root.visible = false; f.root.add(f.drg.root); }
   f.root.scale.setScalar(1); world.scene.add(f.root);
+  if (def.spider) { f.spiderM = buildSpider(); f.root.add(f.spiderM); }
   f.mats = []; f.root.traverse(o => { if (o.isMesh && o.material.emissive) { o.material.userData.e0 = o.material.emissive.clone(); o.material.userData.ei0 = o.material.emissiveIntensity; f.mats.push(o.material); } });
   // 바닥 그림자 블롭 + 오라
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: tex('glow'), color: def.color, transparent: true, opacity: .45, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -2256,7 +2423,9 @@ function animate(f, dt) {
   f.root.rotation.y = f.yaw;
   // 모델 전환
   if (f.rigB) { const bst = f.form === 'beast'; if (bst !== !!f._bst) { f._bst = bst; [f.rig, f.rigB] = [f.rigB, f.rig]; } f.rigB.root.visible = false; }   // 각성 버닝: 괴수화하면 불지네 모델로 교체
-  f.rig.root.visible = !dragon && !f.hidden && !f.bushHid; if (f.drg) f.drg.root.visible = dragon && !f.bushHid;
+  f.rig.root.visible = !dragon && !f.hidden && !f.bushHid && !f.spiderM;
+  if (f.spiderM) { f.spiderM.visible = !f.hidden && !f.bushHid; const run2 = Math.min(1, f.vel / 3); f.spiderM.position.y = Math.abs(Math.sin(f.at * 10)) * .12 * run2; f.spiderM.userData.legs.forEach((l, i) => { l.rotation.z = Math.sin(f.at * 12 + i * 1.7) * .22 * run2; }); }
+  if (f.drg) f.drg.root.visible = dragon && !f.bushHid;
   if (dragon) { f.dragonPop = Math.min(1, f.dragonPop + dt * 2.5); const s = ease.out(f.dragonPop); f.drg.root.scale.setScalar(Math.max(.01, s * (1 + Math.sin(f.dragonPop * 9) * .06 * (1 - f.dragonPop)))); }
   f.blob.scale.setScalar(dragon ? 2 : 1); f.blob.position.y = .05 - (f.air || 0) / (f.root.scale.y || 1); f.blob.visible = !f.hidden && !f.bushHid;
   // 피격 플래시 / 상태 색
@@ -2387,6 +2556,7 @@ function aiInput(f) {
     if (f.def.id === 'pva' && ((k === 'z' && f.ldom) || (k === 'c' && d > 700) || (k === 'x' && d > 800) || (k === 'v' && d > 1200))) continue;
     if (f.def.id === 'pv' && k === 'c' && !(f.st.lock > 0 || f.st.ctl > 0 || f.st.silence > 0 || B.mind || foe(f).veil || (foe(f).cast && foe(f).cast.type))) continue;
     if (k === 'v' && f.form !== 'base' && f.form !== 'hour' && f.form !== 'beast') continue;
+    if (f.def.id === 'mystic' && ((k === 'z' && d > 650) || (k === 'x' && d > 750) || (k === 'v' && (d > 550 || f.vdom)) || (k === 'c' && (f.cocoon || d > 900)))) continue;
     if (f.def.id === 'dkk' && ((k === 'x' && d > 700) || (k === 'c' && (d > 1000 || d < 250)) || (k === 'v' && d > 1300))) continue;
     if (f.def.id === 'burnA' && f.form === 'beast' && !(f.boss > 0) && ((k === 'z' && d > 500) || (k === 'x' && d > 700) || (k === 'v' && d > 900))) continue;
     if (f.def.id === 'burnA' && ((k === 'x' && d > 650) || (k === 'c' && d > 700) || (k === 'z' && d > 1100) || (k === 'v' && f.boss > 0))) continue;
@@ -2413,7 +2583,7 @@ function aimPoint(f) {
   return foe(f);
 }
 // 아공간/영역을 전개하는 스킬 (각성 퓨어바닐라의 빛의 아공간이 켜져 있으면 다른 쿠키는 전개 불가)
-const DOMAIN_SKILLS = { silent: ['v'], lich: ['c'], shadow: ['z', 'x', 'v'], sugar: ['z', 'v'], pv: ['x'] };
+const DOMAIN_SKILLS = { silent: ['v'], lich: ['c'], shadow: ['z', 'x', 'v'], sugar: ['z', 'v'], pv: ['x'], mystic: ['v'] };
 const domainBlocked = (f, k) => !!(DOMAIN_SKILLS[f.def.id] && DOMAIN_SKILLS[f.def.id].includes(k) && B.fighters.some(p => p.ldom && p.hp > 0 && p !== f && !ally(p, f) && realmOf(p) === realmOf(f)));
 function tryUse(f, k) {
   const s = f.def.skills[f.form][k];
@@ -2424,6 +2594,10 @@ function tryUse(f, k) {
   if (f.st.stun > 0 || (f.st.lock > 0 && !pvc)) return;
   if (f.cast && !((f.cast.type === 'field' || f.cast.type === 'paradise') && k === 'v')) return;
   if (k !== 'a' && f.st.silence > 0 && !pvc) { toast(f, '침묵 상태!'); return; }
+  if (f.voidP > 0 && k !== 'a' && !f.cast) {   // 허무: 스킬 발동이 지연된다
+    const dly = Math.min(1.2, .25 * f.voidP); ui.pop(P3(f, 3.4), '⏳ 허무: 발동 지연', '#e8e0c0');
+    runScript(f, [], dly, () => { if (f.hp <= 0) return; const r2 = s.use(f, aimPoint(f)); if (r2 !== false) { f.cmb = B.time; if (r2 !== 'nocd') f.cd[k] = s.cd * (f.soul || f.sealSoul ? 1.5 : 1); } }); return;
+  }
   const r = s.use(f, aimPoint(f));
   if (r !== false) f.cmb = B.time;   // 자연 회복은 공격/피격 후 일정 시간이 지나야 시작
   if (r !== false && r !== 'nocd') f.cd[k] = s.cd * (f.soul || f.sealSoul ? 1.5 : 1);
@@ -2514,7 +2688,7 @@ function update(dt) {
   updBush();
   for (const m of B.fighters) if (m.legion && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
   if (B.fighters.some(m => m.gone && m.legion)) { B.fighters.filter(m => m.gone && m.legion).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && m.legion)); }
-  updFxm(dt); updFire(dt); updLdoms(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
+  updFxm(dt); updFire(dt); updLdoms(dt); updMystic(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   if (B.explore) { updExplore(dt); return; }
@@ -2654,5 +2828,5 @@ export function init() {
   });
   toLobby();
   requestAnimationFrame(frame);
-  window.WB = { get B() { return B; }, runFight, hurt, step: dt => update(dt), startBattle, tryUse, CHARS, SAVE, vfx, world, THREE };
+  window.WB = { get B() { return B; }, runFight, hurt, step: dt => update(dt), startBattle, tryUse, CHARS, SAVE, mouse, vfx, world, THREE };
 }
