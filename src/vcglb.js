@@ -4,6 +4,7 @@
 // (scripts/_bake.html + scripts/_recv.cjs 로 생성 → www/assets/models/<id>/<id>.glb, 텍스처 없음).
 import * as THREE from 'three';
 import { loadGLB } from './glbload.js';
+import { clone as skClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const VC = {
   burn: { url: 'assets/models/burning/burning.glb', h: 2.7 },
@@ -14,6 +15,7 @@ const VC = {
   dkkA: { url: 'assets/models/dkkA/dkkA.glb', h: 3.0 },
   lilyA: { url: 'assets/models/lilyA/lilyA.glb', h: 2.9 },
   berry: { url: 'assets/models/berry/berry.glb', h: 2.8 },
+  timekeeper: { url: 'assets/models/timekeeper/timekeeper.glb', h: 2.7, skinned: true },
   gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
@@ -35,7 +37,7 @@ export function preloadVC(id) {
 export function applyVC(id, rig) {
   const c = cache[id], { body, head, torso, legL, legR, armL, armR, hand } = rig;
   body.clear(); [head, legL, legR, armL, armR, torso].forEach(g => g.clear());
-  const m = c.scene.clone(true); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  const m = VC[id].skinned ? skClone(c.scene) : c.scene.clone(true); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
   m.position.copy(c.off); const holder = new THREE.Group(); holder.add(m); holder.scale.setScalar(c.scale);
   if (VC[id].fit === 'max' && c.size.x > c.size.z) holder.rotation.y = VC[id].yaw ?? -Math.PI / 2;   // 긴 몸통이 앞(+z)을 향하도록
   head.position.set(0, 1.9, 0); torso.position.set(0, 1.1, 0); armR.add(hand);

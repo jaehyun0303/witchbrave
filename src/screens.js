@@ -32,6 +32,7 @@ const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   burn: { rar: '비스트', group: '딜러', role: '근접 도끼 전사', atk: 72, spd: 50, rng: 22 },
   berry: { rar: '에인션트', group: '탱커', role: '방패 수호자', atk: 40, spd: 40, rng: 25 },
   lilyA: { rar: '에인션트', group: '서포터', role: '자유의 백합', atk: 60, spd: 50, rng: 70 },
+  timekeeper: { rar: '레전더리', group: '딜러', role: '시공간 지배자', atk: 70, spd: 55, rng: 50 },
   gold: { rar: '에인션트', group: '딜러', role: '금빛 창술사', atk: 75, spd: 55, rng: 60 },
   mystic: { rar: '비스트', group: '서포터', role: '신비 마법사', atk: 55, spd: 55, rng: 50 },
   brave: { rar: '커먼', group: '딜러', role: '근접 돌격수', atk: 25, spd: 55, rng: 22 },
