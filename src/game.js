@@ -335,7 +335,7 @@ const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === 
 function gameCamPose() {
   let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
   const tgt = cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
-  const big = (a.form === 'angel' || b.form === 'angel' ? 3 : 1) * (B.lfaces && B.lfaces.length || (B.lfogs && B.lfogs.some(g => g.head.length)) ? 1.55 : 1) * (a.form === 'dragon' || b.form === 'dragon' ? 1.9 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
+  const big = (a.cutV || b.cutV ? 1.7 : 1) * (a.form === 'angel' || b.form === 'angel' ? 3 : 1) * (B.lfaces && B.lfaces.length || (B.lfogs && B.lfogs.some(g => g.head.length)) ? 1.55 : 1) * (a.form === 'dragon' || b.form === 'dragon' ? 1.9 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
   const d = cam.dist * big + (cam.fit ? sep * .45 : 0), cp = Math.cos(cam.pitch);
   return { pos: tgt.clone().add(new THREE.Vector3(Math.sin(cam.yaw) * cp * d, Math.sin(cam.pitch) * d, Math.cos(cam.yaw) * cp * d)), look: tgt, fov: 42 };
 }
@@ -3021,23 +3021,31 @@ function endVoid(died) {
   if (died) ui.pop(P3(e, 4), '💀 공허에서 쓰러졌다 (부활 불가)', '#ff9a9a', true);
 }
 function startTimeEnd(f) {   // V: 시간의 끝 (컷신) — 12000 광역 + 시간 오류
-  if (f.cutV) return false; f.cutV = true; setAnim(f, 'cast', 4.2); f.pose = 'raise'; f.st.inv = Math.max(f.st.inv, 4.4);
-  ui.cinema(true); ui.title(f.def.name, '시간의 끝'); ui.tint('rgba(220,20,40,.30)'); ui.flash('#ff2040', .6, .5);
-  const cx = W / 2, cy = H / 2, sky = new THREE.Group(), disc = new THREE.Mesh(new THREE.CircleGeometry(60, 48), new THREE.MeshBasicMaterial({ color: 0xff1a2a, transparent: true, opacity: .55, side: THREE.DoubleSide })); sky.add(disc);
-  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, tk = new THREE.Mesh(new THREE.BoxGeometry(2, 8, .3), new THREE.MeshBasicMaterial({ color: 0xffe0a0 })); tk.position.set(Math.cos(a) * 52, Math.sin(a) * 52, .1); tk.rotation.z = a - Math.PI / 2; sky.add(tk); }
-  const hand1 = new THREE.Mesh(new THREE.BoxGeometry(2, 40, .4).translate(0, 20, 0), new THREE.MeshBasicMaterial({ color: 0xffffff })), hand2 = new THREE.Mesh(new THREE.BoxGeometry(3, 28, .4).translate(0, 14, 0), new THREE.MeshBasicMaterial({ color: 0xffd070 })); sky.add(hand1, hand2);
-  sky.position.copy(P3({ x: cx, y: cy, realm: 0 }, 70)); sky.rotation.x = Math.PI / 2 - .5; sky.scale.setScalar(.01); addExtra(sky);
-  const lines = []; for (let i = 0; i < 5; i++) { const ln = new THREE.Mesh(new THREE.BoxGeometry(.5, .5, 200), new THREE.MeshBasicMaterial({ color: 0xff8090, transparent: true, opacity: .0 })); ln.position.copy(P3({ x: cx + (i - 2) * 400, y: cy, realm: 0 }, 38 + i * 2)); ln.rotation.y = .6; addExtra(ln); lines.push(ln); }
-  const sc = buildScissors(40); sc.position.copy(P3({ x: cx, y: cy, realm: 0 }, 38)); sc.scale.setScalar(.01); sc.rotation.y = .6 + Math.PI / 2; addExtra(sc); let cut = false; const bb = B;
-  act(f, 4.2, (u, dt) => {
-    const t = u * 4.2; f.pose = 'raise'; sky.scale.setScalar(Math.max(.01, ease.out(Math.min(1, t / 1.4)))); hand1.rotation.z -= dt * 1.5; hand2.rotation.z -= dt * .4;
-    lines.forEach((ln, i) => { ln.material.opacity = Math.min(.9, Math.max(0, (t - .8 - i * .15) / .6)); });
-    if (t > 1.6) sc.scale.setScalar(Math.max(.01, ease.out(Math.min(1, (t - 1.6) / .8))));
-    const open = t < 2.8 ? .7 : Math.max(0, .7 - (t - 2.8) / .25 * .7); sc.userData.a.rotation.y = open; sc.userData.b.rotation.y = -open;
-    if (t > 3.05 && !cut) { cut = true; ui.flash('#ffffff', .9, .8); shake(2.4, .9); B.hitstop = Math.max(B.hitstop, .15); lines.forEach(ln => { ln.material.color.setHex(0xffffff); ln.material.opacity = 1; });
-      vfx.ring(P3({ x: cx, y: cy, realm: 0 }), { r0: 1, r1: 90, dur: 1, color: 0xff2040 }); ui.pop(P3(f, 4.6), '⏳ 시간의 끝!', '#ffe0e0', true);
-      for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f)) { hurt(f, o, 12000, { dir: 0 }); if (!o.minion) { o.terr = { left: 12, hist: [], nxt: 3, smp: 0 }; ui.pop(P3(o, 4), '⏳ 시간 오류!', '#ffb0b8', true); } } }
-  }, () => { f.pose = null; f.cutV = false; f.st.inv = 0; [sky, sc, ...lines].forEach(m => rmExtra(m)); if (B === bb) { ui.cinema(false); ui.title('', ''); ui.tint(''); } });
+  if (f.cutV) return false; f.cutV = true; setAnim(f, 'cast', 4.4); f.pose = 'raise'; f.st.inv = Math.max(f.st.inv, 4.6);
+  ui.cinema(true); ui.title(f.def.name, '시간의 끝'); ui.tint('rgba(200,10,30,.14)'); ui.flash('#ff2040', .6, .5);
+  const c0 = P3(f), objs = [];   // 시전자 머리 위에 붉은 시간장판(시계) + 시간선(진짜 줄)
+  const clock = new THREE.Group(), disc = new THREE.Mesh(new THREE.CircleGeometry(20, 56), new THREE.MeshBasicMaterial({ color: 0x6a0010, transparent: true, opacity: .72, side: THREE.DoubleSide })); clock.add(disc);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(20, .35, 8, 64), new THREE.MeshBasicMaterial({ color: 0xffd070 })); clock.add(rim);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283, tk = new THREE.Mesh(new THREE.BoxGeometry(.7, 3, .2), new THREE.MeshBasicMaterial({ color: 0xffe9b0 })); tk.position.set(Math.cos(a) * 17, Math.sin(a) * 17, .1); tk.rotation.z = a - Math.PI / 2; clock.add(tk); }
+  const h1 = new THREE.Mesh(new THREE.BoxGeometry(.7, 14, .2).translate(0, 7, 0), new THREE.MeshBasicMaterial({ color: 0xffffff })), h2 = new THREE.Mesh(new THREE.BoxGeometry(1, 10, .2).translate(0, 5, 0), new THREE.MeshBasicMaterial({ color: 0xffd070 })); clock.add(h1, h2);
+  clock.position.set(c0.x, 1.6, c0.z); clock.rotation.x = -Math.PI / 2 + .25; clock.scale.setScalar(.01); addExtra(clock); objs.push(clock);
+  const lines = [], N = 5; for (let i = 0; i < N; i++) {   // 시간선: 가늘고 긴 붉은 줄 5가닥 (시계 위를 가로지른다)
+    const len = 70, ln = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, len, 6), new THREE.MeshBasicMaterial({ color: 0xff3a50, transparent: true, opacity: 0 }));
+    ln.rotation.z = Math.PI / 2; ln.rotation.y = .5; ln.position.set(c0.x, 3 + i * .5, c0.z + (i - 2) * 3.5); addExtra(ln); lines.push(ln); objs.push(ln);
+  }
+  const sc = buildScissors(11); sc.position.set(c0.x, 4.2, c0.z); sc.rotation.y = .5 + Math.PI / 2; sc.scale.setScalar(.01); addExtra(sc); objs.push(sc); let cut = false; const bb = B;
+  act(f, 4.4, (u, dt) => {
+    const t = u * 4.4; f.pose = 'raise'; clock.scale.setScalar(Math.max(.01, ease.out(Math.min(1, t / 1.2)))); h1.rotation.z -= dt * 2.2; h2.rotation.z -= dt * .5; clock.position.set(P3(f).x, 1.6, P3(f).z);
+    lines.forEach((ln, i) => { ln.material.opacity = Math.min(1, Math.max(0, (t - .7 - i * .12) / .5)); ln.position.x = P3(f).x; ln.position.z = P3(f).z + (i - 2) * 3.5; if (!cut) ln.material.color.setHex(i % 2 ? 0xff3a50 : 0xff8090); });
+    if (t > 1.7) { sc.scale.setScalar(Math.max(.01, ease.out(Math.min(1, (t - 1.7) / .8)))); sc.position.set(P3(f).x + (t < 3 ? -22 + (t - 1.7) / 1.3 * 22 : 0), 4.2, P3(f).z); }
+    const open = t < 3 ? .8 : Math.max(0, .8 - (t - 3) / .25 * .8); sc.userData.a.rotation.y = open; sc.userData.b.rotation.y = -open;
+    if (t > 3.25 && !cut) {   // 가위가 시간선을 싹둑: 줄이 둘로 갈라진다
+      cut = true; ui.flash('#ffffff', .9, .8); shake(2.4, .9); B.hitstop = Math.max(B.hitstop, .15);
+      lines.forEach((ln, i) => { ln.visible = false; for (const sd of [-1, 1]) { const hf = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, 35, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true })); hf.rotation.z = Math.PI / 2; hf.rotation.y = .5; hf.position.set(ln.position.x + sd * 17.5 * Math.cos(.5), ln.position.y, ln.position.z - sd * 17.5 * Math.sin(.5)); addFxm(hf, 1.2, (uu, m) => { m.position.x += sd * dt * 14 * Math.cos(.5); m.position.z -= sd * dt * 14 * Math.sin(.5); m.position.y -= dt * 6 * uu; m.material.opacity = 1 - uu; }); } });
+      vfx.ring(P3(f), { r0: 1, r1: 90, dur: 1, color: 0xff2040 }); ui.pop(P3(f, 4.6), '⏳ 시간의 끝!', '#ffe0e0', true);
+      for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f)) { hurt(f, o, 12000, { dir: 0 }); if (!o.minion) { o.terr = { left: 12, hist: [], nxt: 3, smp: 0 }; ui.pop(P3(o, 4), '⏳ 시간 오류!', '#ffb0b8', true); } }
+    }
+  }, () => { f.pose = null; f.cutV = false; f.st.inv = 0; objs.forEach(m => rmExtra(m)); if (B === bb) { ui.cinema(false); ui.title('', ''); ui.tint(''); } });
 }
 function updTimekeeper(dt) {
   for (const f of B.fighters) {
@@ -3413,7 +3421,7 @@ function updGold(dt) {
   B.gfx = B.gfx.filter(g => { if (g.t >= g.dur) { rmExtra(g.m); return false; } return true; });
   if (B.gsp) {
     for (const s of B.gsp) {   // 하늘에서 떨어지는 창
-      s.t += dt; const u = Math.min(1, s.t / s.fall); s.m.position.copy(W3(s.x, s.y, lerp(34, .4, u * u)));
+      s.t += dt; const u = Math.min(1, s.t / s.fall), e1 = W3(s.x, s.y, .4); s.m.position.copy(W3(s.x - s.ox * (1 - u), s.y - s.oy * (1 - u), lerp(34, .4, u))); s.m.lookAt(e1);   // 시작점→착지점 방향을 창끝이 향한다
       if (s.t >= s.fall && !s.done) {
         s.done = true; rmExtra(s.m); const p = W3(s.x, s.y, .2); vfx.burst('glow', p, 5, { speed: 2, speed2: 6, life: .45, size: .7, c0: 0xffffff, c1: GLD, up: 2 }); vfx.ring(p, { r0: .3, r1: 3, dur: .35, color: GLD });
         const f = s.owner; for (const t of B.fighters) if (t !== f && t.hp > 0 && !ally(f, t) && realmOf(t) === s.realm && Math.hypot(t.x - s.x, t.y - s.y) < s.r + t.r) {
@@ -3440,8 +3448,8 @@ function updGold(dt) {
       while (r.n < r.N && r.t >= .5 + r.n * .04) {
         r.n++; const base = tg && tg !== B.ghost && tg.hp > 0 ? tg : { x: r.px, y: r.py }, cl = r.n % 2 === 0, a = rnd(0, 6.283), d = Math.sqrt(Math.random()) * (cl ? 70 : 220);
         const x = clamp(base.x + Math.cos(a) * d, PAD, W - PAD), y = clamp(base.y + Math.sin(a) * d, PAD, H - PAD);
-        const m = goldSpear(5, .12); m.rotation.set(Math.PI / 2 + .12, 0, 0); m.position.copy(W3(x, y, 34)); addExtra(m);
-        (B.gsp = B.gsp || []).push({ m, x, y, t: 0, fall: .5, r: 85, dmg: 12000 / r.N, owner: f, realm: realmOf(f) });
+        const m = goldSpear(5, .12), ra = f.face + rnd(-.25, .25); addExtra(m);
+        (B.gsp = B.gsp || []).push({ m, x, y, ox: Math.cos(ra) * 380, oy: Math.sin(ra) * 380, t: 0, fall: .55, r: 85, dmg: 12000 / r.N, owner: f, realm: realmOf(f) });   // 비스듬히(진행 방향으로 기울어) 떨어진다
       }
       if (r.n >= r.N) f.rain = null;
     }
@@ -3483,12 +3491,12 @@ CHARS.gold = {
           const t = u * 3.2; f.face = a0; f.pose = 'raise'; f.air = 15 * Math.min(1, t / 1.1) * (t > 2.7 ? Math.max(0, 1 - (t - 2.7) / .5) : 1);   // 하늘로 날아올랐다가 내려온다
           const c = P3(f, 0);
           while (made < 60 && t >= .9 + made * .03) {   // 하늘에 금빛 창이 하나씩 생겨난다
-            const a = rnd(0, 6.283), d = rnd(4, 20), m = goldSpear(5, .12); m.position.set(c.x + Math.cos(a) * d, 20 + rnd(0, 7), c.z + Math.sin(a) * d); m.rotation.set(Math.PI / 2 - .35, -a0 + Math.PI / 2, 0); m.scale.setScalar(.01); addExtra(m); sky.push({ m, k: 0 }); made++;
+            const a = rnd(0, 6.283), d = rnd(4, 20), m = goldSpear(5, .12); m.position.set(c.x + Math.cos(a) * d, 12 + rnd(0, 6), c.z + Math.sin(a) * d); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize()); m.userData.dir = new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize(); m.scale.setScalar(.01); addExtra(m); sky.push({ m, k: 0 }); made++;
             vfx.burst('glow', m.position.clone(), 3, { speed: 1, life: .4, size: .8, c0: 0xffffff, c1: GLD });
           }
           for (const s of sky) { s.k = Math.min(1, s.k + dt * 4); s.m.scale.setScalar(s.k); s.m.position.y += Math.sin(t * 6 + s.m.position.x) * dt * .6; }
           if (t > .8 && t < 2.7 && Math.random() < .5) vfx.ring(P3(f, 0), { r0: 1, r1: 14, dur: .6, color: GLD, alpha: .6 });
-          if (t > 2.4) sky.forEach(s => { s.m.position.y -= dt * 40; });
+          if (t > 2.4) sky.forEach(s => { s.m.position.addScaledVector(s.m.userData.dir, dt * 22); });
         }, () => {
           sky.forEach(s => rmExtra(s.m)); ui.cinema(false); ui.title('', ''); f.pose = null; f.air = 0; f.cutV = false;
           ui.flash('#ffd84a', .5, .5); shake(1.4, .8); ui.pop(P3(f, 4.6), '✦ 금빛 창의 비!', '#fff0a8', true);
@@ -3835,7 +3843,7 @@ function inRealm(rl, fn) {
     }
   }
 }
-const inR = fn => { if (B.seal || B.abyss) { inRealm(0, fn); inRealm(1, fn); } else fn(); };
+const inR = fn => { if (B.seal || B.abyss || B.dream || B.voidR) { inRealm(0, fn); inRealm(1, fn); } else fn(); };
 function update(dt) {
   B.dt = dt; updSealBtn();
   B.shakeT = Math.max(0, B.shakeT - dt); if (B.shakeT <= 0) B.shake = Math.max(0, B.shake - dt * 3);
