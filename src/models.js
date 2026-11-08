@@ -32,7 +32,7 @@ export function heartMesh(mat, size = 1) {
 
 /* ================= 쿠키 (일반 형태) ================= */
 export function buildCookie(def) {
-  const id = def.id === 'lichA' ? 'lich' : def.id, col = new THREE.Color(def.color);
+  const id = def.id === 'lichA' ? 'lich' : def.id === 'pitayaA' ? 'pitaya' : def.id, col = new THREE.Color(def.color);
   const P = {
     pv: { skin: 0xfff0dc, hair: 0xfff8e0, eye: 0xffc933, cloth: 0xf7e7c4, trim: 0xffd873 },
     silent: { skin: 0xf1ebe0, hair: 0xf6f8ff, eye: 0x9fc0ff, cloth: 0x34447f, trim: 0xcfd8ff },
@@ -120,7 +120,7 @@ export function buildCookie(def) {
   if (id === 'dark' && darkReady()) applyDark(rig);
   if (id === 'shadow' && shadowReady()) applyShadow(rig);
   if ((id === 'pv' || id === 'silent') && fbxReady(id)) applyFbx(id, rig);
-  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA' || id === 'dkk' || id === 'dkkA' || id === 'pitaya' || id === 'timekeeper' || id === 'berry' || id === 'lilyA' || id === 'burnB' || id === 'mystic' || id === 'gold') && vcReady(id)) applyVC(id, rig);
+  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA' || id === 'dkk' || id === 'dkkA' || id === 'pitaya' || id === 'ananas' || id === 'timekeeper' || id === 'berry' || id === 'lilyA' || id === 'burnB' || id === 'mystic' || id === 'gold') && vcReady(id)) applyVC(id, rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

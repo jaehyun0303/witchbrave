@@ -17,6 +17,8 @@ const VC = {
   berry: { url: 'assets/models/berry/berry.glb', h: 2.8 },
   timekeeper: { url: 'assets/models/timekeeper/timekeeper.glb', h: 2.7, skinned: true },
   pitaya: { url: 'assets/models/pitaya/pitaya.glb', h: 2.8, skinned: true },
+  pitayaD: { url: 'assets/models/pitayaD/pitayaD.glb', h: 8 },   // 변신(용과드래곤) 모델
+  ananas: { url: 'assets/models/ananas/ananas.glb', h: 2.8, skinned: true },
   gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
@@ -45,4 +47,21 @@ export function applyVC(id, rig) {
   body.add(holder, legL, legR, torso, head, armL, armR);
   if (rig.weapon) { rig.weapon.visible = false; rig.weapon = null; }
   rig.headY = 1.9;
+}
+
+export function makeVCModel(id) {   // 이름 붙은 정점색 모델을 독립 그룹으로 하나 더 만든다 (변신 모델 등)
+  const c = cache[id]; if (!c) return null; const m = c.scene.clone(true); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  m.position.copy(c.off); const h = new THREE.Group(); h.add(m); h.scale.setScalar(c.scale); return h;
+}
+let phCache = null;
+export function buildPitayaHead() {   // 용과드래곤 모델에서 머리 부분(삼각형)만 떼어낸 메시. 앞(+z)을 향한다
+  const c = cache.pitayaD; if (!c) return null;
+  if (!phCache) {
+    let mesh = null; c.scene.traverse(o => { if (o.isMesh && !mesh) mesh = o; }); if (!mesh || !mesh.geometry.index) return null;
+    const g = mesh.geometry, pos = g.attributes.position, idx = g.index.array, keep = [], inb = i => { const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i); return x >= -.34 && x <= -.12 && y >= 0 && y <= .3 && z >= .12 && z <= .45; };
+    for (let t = 0; t < idx.length; t += 3) if (inb(idx[t]) && inb(idx[t + 1]) && inb(idx[t + 2])) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+    const ng = new THREE.BufferGeometry(); for (const k in g.attributes) ng.setAttribute(k, g.attributes[k]); ng.setIndex(keep); ng.computeBoundingBox();
+    const bb = ng.boundingBox, ctr = bb.getCenter(new THREE.Vector3()); phCache = { ng, ctr, size: Math.max(...bb.getSize(new THREE.Vector3()).toArray()), mat: mesh.material };
+  }
+  const m = new THREE.Mesh(phCache.ng, phCache.mat.clone()); m.position.sub(phCache.ctr); m.frustumCulled = false; const w = new THREE.Group(); w.add(m); w.userData.size = phCache.size; return w;
 }
