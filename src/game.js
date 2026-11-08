@@ -157,9 +157,9 @@ function killProj(p) { p.life = 0; if (p.vis) { world.scene.remove(p.vis); p.vis
 function updProjs(dt) {
   for (const p of B.projs) {
     if (p.homing) { const t = foe(p.owner); if (t.hp > 0 && Math.hypot(t.x - p.x, t.y - p.y) < p.homing) { const want = Math.atan2(t.y - p.y, t.x - p.x), cur = Math.atan2(p.vy, p.vx), d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur)), na = cur + clamp(d, -p.turn * dt, p.turn * dt), sp = Math.hypot(p.vx, p.vy); p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp; } }
-    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.age = (p.age || 0) + dt;
     if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) p.life = 0;
-    const wp = P3(p, 1.2);
+    const wp = P3(p, p.h0 !== undefined ? lerp(p.h0, 1.2, Math.min(1, p.age / .45)) : 1.2);
     if (p.vis) {
       p.vis.position.copy(wp);
       if (p.kind === 'heart') { p.vis.userData.mesh.rotation.y += dt * 8; p.vis.userData.mesh.rotation.z = Math.sin(B.time * 14) * .3; }
@@ -330,7 +330,7 @@ const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === 
 function gameCamPose() {
   let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
   const tgt = cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
-  const big = (a.form === 'dragon' || b.form === 'dragon' ? 1.15 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
+  const big = (B.lfaces && B.lfaces.length || (B.lfogs && B.lfogs.some(g => g.head.length)) ? 1.55 : 1) * (a.form === 'dragon' || b.form === 'dragon' ? 1.9 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
   const d = cam.dist * big + (cam.fit ? sep * .45 : 0), cp = Math.cos(cam.pitch);
   return { pos: tgt.clone().add(new THREE.Vector3(Math.sin(cam.yaw) * cp * d, Math.sin(cam.pitch) * d, Math.cos(cam.yaw) * cp * d)), look: tgt, fov: 42 };
 }
@@ -2415,8 +2415,8 @@ function lichAFaceOld(scale) {   // 거대한 얼굴 (임시: 절차 모델. 실
   const g = buildLichFace(); g.scale.setScalar(scale); return g;
 }
 function startLichFace(f) {   // Z: 앞에 거대한 얼굴이 나타나 하트를 마구 쏜다 (하트당 600)
-  const tg = foe(f), a = tg && tg !== B.ghost ? ang(f, tg) : f.face, fx = clamp(f.x + Math.cos(a) * 330, PAD, W - PAD), fy = clamp(f.y + Math.sin(a) * 330, PAD, H - PAD);
-  setAnim(f, 'cast', 1); const face = lichAFace(.01); face.position.copy(W3(fx, fy, 9)); face.lookAt(W3(fx + Math.cos(a) * 100, fy + Math.sin(a) * 100, 9)); addExtra(face);
+  const tg = foe(f), a = tg && tg !== B.ghost ? ang(f, tg) : f.face, fx = clamp(f.x + Math.cos(a) * 130, PAD, W - PAD), fy = clamp(f.y + Math.sin(a) * 130, PAD, H - PAD);
+  setAnim(f, 'cast', 1); const face = lichAFace(.01); face.position.copy(W3(fx, fy, 6)); face.lookAt(W3(fx + Math.cos(a) * 100, fy + Math.sin(a) * 100, 6)); addExtra(face);
   B.lfaces = B.lfaces || []; B.lfaces.push({ owner: f, face, t: 0, n: 0, N: 45, fx, fy, a });
   vfx.ring(P3(f), { r0: .5, r1: 10, dur: .7, color: 0xff6ad8 }); ui.flash('#ff6ad8', .3, .4); shake(.8, .6); ui.pop(P3(f, 4.4), '💗 거대한 얼굴!', '#ff9ae6', true);
 }
@@ -2477,8 +2477,8 @@ function updLichA(dt) {
   // --- 거대한 얼굴 하트 ---
   if (B.lfaces && B.lfaces.length) {
     for (const q of B.lfaces) {
-      const f = q.owner; q.t += dt; const u = Math.min(1, q.t / .8), out = q.t > .8 + q.N * .07 + .3 ? Math.max(0, 1 - (q.t - (.8 + q.N * .07 + .3)) / .5) : 1; q.face.scale.setScalar(Math.max(.01, 3.4 * ease.out(u) * out)); q.face.position.y = 9 + Math.sin(q.t * 2) * .5;
-      while (q.n < q.N && q.t >= .8 + q.n * .07 && f.hp > 0) { q.n++; const tg = foe(f), a = (tg && tg !== B.ghost ? Math.atan2(tg.y - q.fy, tg.x - q.fx) : q.a) + rnd(-.3, .3); shoot(f, { x: q.fx, y: q.fy, a, sp: 700, r: 13, dmg: 600, color: 0xff7ae0, kind: 'heart', life: 1.5 }); }
+      const f = q.owner; q.t += dt; const u = Math.min(1, q.t / .8), out = q.t > .8 + q.N * .07 + .3 ? Math.max(0, 1 - (q.t - (.8 + q.N * .07 + .3)) / .5) : 1; q.face.scale.setScalar(Math.max(.01, 3.2 * ease.out(u) * out)); q.face.position.y = 6 + Math.sin(q.t * 2) * .3;
+      while (q.n < q.N && q.t >= .8 + q.n * .07 && f.hp > 0) { q.n++; const tg = foe(f), a = (tg && tg !== B.ghost ? Math.atan2(tg.y - q.fy, tg.x - q.fx) : q.a) + rnd(-.3, .3); shoot(f, { x: q.fx, y: q.fy, a, sp: 700, r: 13, dmg: 600, color: 0xff7ae0, kind: 'heart', life: 1.5, h0: 6 }); }
       if (q.t > .8 + q.N * .07 + .9) { rmExtra(q.face); q.done = true; }
     }
     B.lfaces = B.lfaces.filter(q => !q.done);
@@ -2520,13 +2520,13 @@ function updLichA(dt) {
         if (inside && Math.random() < .5) { g.inv = 1.6; ui.pop(P3(f, 3.8), '투명', '#d8b0ff'); }
         const es = B.fighters.filter(o => o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f) && Math.hypot(o.x - g.x, o.y - g.y) < g.r + o.r), e = es.length ? es[Math.floor(Math.random() * es.length)] : null;
         if (e) {   // 적 앞에 머리가 나와 브레스
-          const a = ang(e, f) + rnd(-.5, .5), hx = clamp(e.x + Math.cos(a) * 260, PAD, W - PAD), hy = clamp(e.y + Math.sin(a) * 260, PAD, H - PAD), hd = lichAFace(.01); hd.position.copy(W3(hx, hy, 4)); hd.lookAt(P3(e, 3)); addExtra(hd);
+          const a = ang(e, f) + rnd(-.5, .5), hx = clamp(e.x + Math.cos(a) * 480, PAD, W - PAD), hy = clamp(e.y + Math.sin(a) * 480, PAD, H - PAD), hd = lichAFace(.01); hd.position.copy(W3(hx, hy, 3.5)); hd.lookAt(P3(e, 3)); addExtra(hd);
           g.head.push({ m: hd, t: 0, e, x: hx, y: hy, fired: false });
         }
       }
       for (const h of g.head) {
-        h.t += dt; h.m.scale.setScalar(Math.max(.01, 1.3 * ease.out(Math.min(1, h.t / .35)) * (h.t > 1.1 ? Math.max(0, 1 - (h.t - 1.1) / .3) : 1)));
-        if (h.t > .5 && !h.fired) { h.fired = true; const a = Math.atan2(h.e.y - h.y, h.e.x - h.x); shoot(f, { x: h.x, y: h.y, a, sp: 1100, r: 40, dmg: 700, color: 0xb050ff, kind: 'beam', life: .6, pierce: true, onHit: t => { t.fear = Math.max(t.fear || 0, 2); } }); shake(.4, .3); }
+        h.t += dt; h.m.scale.setScalar(Math.max(.01, 2.6 * ease.out(Math.min(1, h.t / .35)) * (h.t > 1.1 ? Math.max(0, 1 - (h.t - 1.1) / .3) : 1)));
+        if (h.t > .5 && !h.fired) { h.fired = true; const a = Math.atan2(h.e.y - h.y, h.e.x - h.x); shoot(f, { x: h.x, y: h.y, a, sp: 1100, r: 40, dmg: 700, color: 0xb050ff, kind: 'beam', life: .6, pierce: true, h0: 3, onHit: t => { t.fear = Math.max(t.fear || 0, 2); } }); shake(.4, .3); }
         if (h.t > 1.4) { rmExtra(h.m); h.done = true; }
       }
       g.head = g.head.filter(h => !h.done);
@@ -2552,9 +2552,9 @@ function updEndSky(dt) {
   }
   q.stars = q.stars.filter(s => !s.done);
   if (t >= 9.5 && !q.face) {   // 하늘에서 거대한 리치드래곤의 머리
-    const e0 = es(), e = e0.length ? e0[0] : null, fx = e ? e.x : W / 2, fy = e ? e.y : H / 2; q.face = lichAFace(.01); q.face.position.copy(W3(fx, fy, 36)); q.face.rotation.x = .9; addExtra(q.face); q.fx = fx; q.fy = fy; ui.pop(P3(f, 4.4), '💗 거대한 얼굴이 하늘에!', '#ff9ae6', true);
+    const e0 = es(), e = e0.length ? e0[0] : null, fx = e ? e.x : W / 2, fy = e ? e.y : H / 2; q.face = lichAFace(.01); q.face.position.copy(W3(fx, fy, 14)); q.face.rotation.x = .9; addExtra(q.face); q.fx = fx; q.fy = fy; ui.pop(P3(f, 4.4), '💗 거대한 얼굴이 하늘에!', '#ff9ae6', true);
   }
-  if (q.face) { const u = Math.min(1, (t - 9.5) / 1), out = t > 13.2 ? Math.max(0, 1 - (t - 13.2) / .6) : 1; q.face.scale.setScalar(Math.max(.01, 7 * ease.out(u) * out)); }
+  if (q.face) { const u = Math.min(1, (t - 9.5) / 1), out = t > 13.2 ? Math.max(0, 1 - (t - 13.2) / .6) : 1; q.face.scale.setScalar(Math.max(.01, 12 * ease.out(u) * out)); }
   if (t >= 11 && !q.heart) { const m = heartMesh(new THREE.MeshStandardMaterial({ color: 0xff6adf, emissive: 0xff2ac0, emissiveIntensity: 1.8, roughness: .3 }), 4); m.position.copy(W3(q.fx, q.fy, 34)); addExtra(m); q.heart = { m, t: 0 }; }
   if (q.heart) {
     const h = q.heart; h.t += dt; h.m.position.y = lerp(34, .8, Math.min(1, h.t / 1.2) ** 2); h.m.rotation.y += dt * 4;
@@ -3150,7 +3150,7 @@ function animate(f, dt) {
   f.rig.root.visible = !dragon && !f.hidden && !f.bushHid && !f.spiderM;
   if (f.spiderM) { f.spiderM.visible = !f.hidden && !f.bushHid; const run2 = Math.min(1, f.vel / 3); f.spiderM.position.y = Math.abs(Math.sin(f.at * 10)) * .12 * run2; f.spiderM.userData.legs.forEach((l, i) => { l.rotation.z = Math.sin(f.at * 12 + i * 1.7) * .22 * run2; }); }
   if (f.drg) f.drg.root.visible = dragon && !f.bushHid;
-  if (dragon) { f.dragonPop = Math.min(1, f.dragonPop + dt * 2.5); const s = ease.out(f.dragonPop); f.drg.root.scale.setScalar(Math.max(.01, s * (1 + Math.sin(f.dragonPop * 9) * .06 * (1 - f.dragonPop)))); }
+  if (dragon) { f.dragonPop = Math.min(1, f.dragonPop + dt * 2.5); const s = ease.out(f.dragonPop); f.drg.root.scale.setScalar(Math.max(.01, s * 1.7 * (1 + Math.sin(f.dragonPop * 9) * .06 * (1 - f.dragonPop)))); }
   f.blob.scale.setScalar(dragon ? 2 : 1); f.blob.position.y = .05 - (f.air || 0) / (f.root.scale.y || 1); f.blob.visible = !f.hidden && !f.bushHid;
   // 피격 플래시 / 상태 색
   const fl = f.flash > 0;

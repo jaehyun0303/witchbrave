@@ -46,9 +46,8 @@ export function buildDragonHead() {
   const model = clone(cache); let sm = null; model.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; }); if (!sm) return null;
   const h = headGeo(sm); if (h.n < 200) return null;
   sm.geometry = h.geo; sm.material = sm.material.clone(); sm.material.emissive = new THREE.Color(0x6a28b0); sm.material.emissiveIntensity = .7; sm.frustumCulled = false; sm.castShadow = false;
-  model.updateMatrixWorld(true);
-  const pos = h.geo.attributes.position, v = new THREE.Vector3(), box = new THREE.Box3(); const used = new Set(h.geo.index.array);
-  for (const i of used) { v.fromBufferAttribute(pos, i).applyMatrix4(sm.matrixWorld); box.expandByPoint(v); }
-  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), root = new THREE.Group(); model.position.sub(c); root.add(model);
-  root.userData.size = Math.max(s.x, s.y, s.z); return root;
+  const pos = h.geo.attributes.position, v = new THREE.Vector3(), box = new THREE.Box3(), root = new THREE.Group(); root.add(model); const used = Array.from(new Set(h.geo.index.array));
+  const meas = () => { model.updateMatrixWorld(true); sm.skeleton.update(); box.makeEmpty(); for (let k = 0; k < used.length; k += 7) { const j = used[k]; v.fromBufferAttribute(pos, j); sm.applyBoneTransform(j, v); v.applyMatrix4(sm.matrixWorld); box.expandByPoint(v); } return box; };
+  for (let it = 0; it < 3; it++) model.position.sub(meas().getCenter(new THREE.Vector3()));   // 스킨드(뼈 적용) 위치 기준으로 머리 중심을 원점에 맞춘다
+  const s = meas().getSize(new THREE.Vector3()); root.userData.size = Math.max(s.x, s.y, s.z); return root;
 }
