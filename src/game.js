@@ -6,7 +6,7 @@ import { RAID_BOSS_HP, RAID_TIME } from './hub.js';
 import { isTouch, TOUCH, initTouch, showTouch, updateTouch } from './touch.js';
 import { VFX, ease, isDark } from './vfx.js';
 import { buildCookie, buildDragon, buildMoon, heartMesh } from './models.js';
-import { poseBone } from './dragonglb.js';
+import { poseBone, buildDragonHead } from './dragonglb.js';
 import { tex, loadManifest } from './tex.js';
 import * as ui from './ui.js';
 
@@ -325,7 +325,7 @@ const APEX = new THREE.Vector3(-3, 26, -32);
 const camState = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 42 };
 // 자유 시점: 우클릭 드래그=회전, 휠=줌, Q/E=회전, T=내 캐릭터 추적 ↔ 둘 다 보기
 const cam = { yaw: 0, pitch: .95, dist: 15, fit: false };
-const realmS = () => B && (B.seal || (B.abyss && !B.abyss.done ? B.abyss : null));   // 별도 세계(봉인수 내부 / 드래곤의 심연) 상태
+const realmS = () => B && (B.seal || (B.abyss && !B.abyss.done ? B.abyss : null) || (B.dream ? B.dream.rs : null));   // 별도 세계(봉인수 내부 / 드래곤의 심연) 상태
 const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === s.target || B.viewSeal)); };
 function gameCamPose() {
   let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
@@ -1383,14 +1383,15 @@ function endSeal() {
 }
 function toggleSealView() {
   const s = realmS(); if (!s || B.fighters[0] !== s.owner) return;
-  B.viewSeal = !B.viewSeal; camState.init = false; ui.toast(B.viewSeal ? (B.abyss ? '드래곤의 심연 화면' : '봉인수 내부 화면') : '내 화면');
+  B.viewSeal = !B.viewSeal; camState.init = false; ui.toast(B.viewSeal ? (B.dream ? '👁 상대의 꿈 화면' : B.abyss ? '드래곤의 심연 화면' : '봉인수 내부 화면') : '내 화면');
 }
 let sealBtn = null;
 function updSealBtn() {
   if (!sealBtn) { sealBtn = document.createElement('button'); sealBtn.id = 'sealview'; sealBtn.style.cssText = 'position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:80;padding:8px 16px;border-radius:999px;border:2px solid #7dffd0;background:rgba(6,22,26,.85);color:#bfffe8;font:700 14px sans-serif;display:none;cursor:pointer'; sealBtn.addEventListener('click', toggleSealView); document.body.appendChild(sealBtn); }
-  const s = realmS(), show = !!(s && B.fighters[0] === s.owner); sealBtn.style.display = show ? 'block' : 'none';
-  if (show) { const ab = !!B.abyss; sealBtn.textContent = B.viewSeal ? '↩ 내 화면으로 (G)' : (ab ? '👁 드래곤의 심연 보기 (G)' : '👁 봉인수 내부 보기 (G)'); sealBtn.style.borderColor = ab ? '#ff6070' : '#7dffd0'; sealBtn.style.color = ab ? '#ffc0c8' : '#bfffe8'; }
-  if (B) world.viewAbyss(!!(B.abyss && !B.abyss.done && viewRealm()));
+  const s = realmS(), dr = !!(B.dream && B.fighters[0] === B.dream.f), show = !!(s && B.fighters[0] === s.owner); sealBtn.style.display = show ? 'block' : 'none';
+  if (dr) { sealBtn.textContent = B.viewSeal ? '↩ 내 화면으로 (G)' : '👁 상대의 꿈 보기 · 꿈 ' + B.dream.stage + ' (G)'; sealBtn.style.borderColor = '#e0b8ff'; sealBtn.style.color = '#f0dcff'; }
+  else if (show) { const ab = !!B.abyss; sealBtn.textContent = B.viewSeal ? '↩ 내 화면으로 (G)' : (ab ? '👁 드래곤의 심연 보기 (G)' : '👁 봉인수 내부 보기 (G)'); sealBtn.style.borderColor = ab ? '#ff6070' : '#7dffd0'; sealBtn.style.color = ab ? '#ffc0c8' : '#bfffe8'; }
+  if (B) { world.viewAbyss(!!(B.abyss && !B.abyss.done && viewRealm())); world.viewDream(!!(B.dream && viewRealm())); }
 }
 function becomeSealSoul(t) {
   clearStates(t); const ratio = Math.max(.01, t.hp / t.max);
@@ -2405,7 +2406,12 @@ CHARS.dkk.awakeId = 'dkkA';
 /* ===== 각성 리치드래곤 쿠키 (id 'lichA', HP 30000) ===== */
 const LCH = 0xc46bff;
 CHARS.lich_dream = { ...CHARS.lich, hp: 2000, mob: true, aiPref: 240, atkRange: 420, dragon: undefined, awake: undefined, ult: undefined, tag: '몽롱한 꿈 분신', skills: { base: { a: { name: '꿈의 하트', cd: 1.1, desc: '분신의 하트 200', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 520, r: 11, dmg: 200, color: 0xff7ae0, kind: 'heart', life: 1.05 }); } } } } };
-function lichAFace(scale) {   // 거대한 얼굴 (임시: 절차 모델. 실제 용 모델에서 얼굴만 떼어내는 건 스킨드 메시라 어려워 보류)
+function lichAFace(scale) {
+  const hd = buildDragonHead();
+  if (hd) { hd.scale.setScalar(5.5 / Math.max(.5, hd.userData.size)); const w = new THREE.Group(); w.add(hd); w.scale.setScalar(scale); return w; }   // 실제 용 모델 머리 (scale 1 ≈ 폭 5.5)
+  return lichAFaceOld(scale);
+}
+function lichAFaceOld(scale) {   // 거대한 얼굴 (임시: 절차 모델. 실제 용 모델에서 얼굴만 떼어내는 건 스킨드 메시라 어려워 보류)
   const g = buildLichFace(); g.scale.setScalar(scale); return g;
 }
 function startLichFace(f) {   // Z: 앞에 거대한 얼굴이 나타나 하트를 마구 쏜다 (하트당 600)
@@ -2608,7 +2614,9 @@ function startDream(f) {
   f.gauge = 0; setAnim(f, 'cast', 2); f.pose = 'float'; runScript(f, [], 2.2, () => { f.pose = null; });
   if (f.team === undefined) f.team = 100 + B.fighters.indexOf(f);
   B.dream = { f, e, stage: 0, t: 0, ss: {}, mobs: [], objs: [], over: false, human: e === B.fighters[0] };
-  e.st.inv = 0; f.nofoe = true; ui.flash('#c46bff', .7, .7); ui.title('꿈', 'THE DREAM'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2200);
+  e.st.inv = 0; f.nofoe = true; const D0 = B.dream; D0.rs = { owner: f, target: e }; D0.ret = { x: e.x, y: e.y };
+  clearStates(e); dropOwned(x => x.owner === e); B.projs.forEach(p => { if (p.owner === e) killProj(p); }); e.realm = 1; B.viewSeal = false; camState.init = false;   // 적만 별도 세계(꿈)로 보낸다 — G 로 상대 시점 보기
+  ui.flash('#c46bff', .7, .7); ui.title('꿈', 'THE DREAM'); const bb = B; setTimeout(() => { if (B === bb) ui.title('', ''); }, 2200);
   dreamStage(1);
 }
 function dreamTitle(t, sub) { ui.pop(P3(B.dream.e, 4.6), t, '#e0b8ff', true); ui.toast(t + (sub ? ' — ' + sub : '')); }
@@ -2618,11 +2626,12 @@ function dreamClear() {
 }
 function dreamStage(n) {
   const D = B.dream, e = D.e, f = D.f; dreamClear(); D.stage = n; D.t = 0; D.ss = {};
-  const mk = (id, hp, x, y) => { const m = addMinion(id, x, y, { hp, pm: f.pm || 1, realm: f.realm, notag: false }); m.team = f.team; m.cmb = B.time; D.mobs.push(m); return m; };
+  world.setDream(n); camState.init = false; e.realm = 1; e.x = W / 2; e.y = H / 2; e.st.inv = Math.max(e.st.inv, 1);   // 단계마다 전혀 다른 공간
+  const mk = (id, hp, x, y) => { const m = addMinion(id, x, y, { hp, pm: f.pm || 1, realm: 1, notag: false }); m.team = f.team; m.dmob = true; m.cmb = B.time; D.mobs.push(m); return m; };
   if (n === 1) {   // 차오르는 바다 — 높은 곳(섬)에 서 있어야 산다
     dreamTitle('🌊 꿈 1', '차오르는 바다에서 높은 곳으로!');
-    const isl = []; for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283 + .5, x = clamp(e.x + Math.cos(a) * 520, PAD + 80, W - PAD - 80), y = clamp(e.y + Math.sin(a) * 520, PAD + 80, H - PAD - 80); isl.push({ x, y, r: 150, d: vfx.decal(P3({ x, y }), { tex: 'ring', r: 150 * S, color: 0xfff0a8, alpha: .9, y: .1 }) }); }
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(W * S * 1.2, H * S * 1.2), new THREE.MeshBasicMaterial({ color: 0x2a6fe0, transparent: true, opacity: .55, depthWrite: false })); water.rotation.x = -Math.PI / 2; water.position.y = -3; addExtra(water); D.objs.push(water); D.ss.isl = isl; D.ss.water = water;
+    const isl = []; for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283 + .5, x = clamp(e.x + Math.cos(a) * 520, PAD + 80, W - PAD - 80), y = clamp(e.y + Math.sin(a) * 520, PAD + 80, H - PAD - 80); isl.push({ x, y, r: 150, d: vfx.decal(P3({ x, y, realm: 1 }), { tex: 'ring', r: 150 * S, color: 0xfff0a8, alpha: .9, y: .1 }) }); }
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(W * S * 1.2, H * S * 1.2), new THREE.MeshBasicMaterial({ color: 0x2a6fe0, transparent: true, opacity: .55, depthWrite: false })); water.rotation.x = -Math.PI / 2; water.position.set(RDX, -3, 0); addExtra(water); D.objs.push(water); D.ss.isl = isl; D.ss.water = water;
   } else if (n === 2) {   // 어머니의 유혹
     dreamTitle('💞 꿈 2', '어머니: "영원히 함께 살자…" 거절하세요');
     if (D.human) {
@@ -2639,15 +2648,16 @@ function dreamStage(n) {
   } else if (n === 5) {   // 붉은 달
     dreamTitle('🔴 붉은 달', '분신을 처치하고, 미로를 지나, 자물쇠를 풀어 탈출하세요 (60초)');
     ui.tint('rgba(220,20,40,.30)'); const cl = mk('lich_dream', 9000, clamp(e.x + 380, PAD, W - PAD), e.y); cl.max = cl.hp = 9000; D.ss.clone = cl; D.ss.life = 60; D.ss.code = String(Math.floor(1000 + Math.random() * 9000)); D.ss.phase = 0;
-    const pil = []; for (let i = 0; i < 9; i++) { const x = clamp(e.x + rnd(-700, 700), PAD + 80, W - PAD - 80), y = clamp(e.y + rnd(-420, 420), PAD + 80, H - PAD - 80); B.objs.push({ x, y, r: 70, realm: 0, dream: true }); pil.push(x); const pm = new THREE.Mesh(new THREE.CylinderGeometry(70 * S, 70 * S, 6, 12), new THREE.MeshStandardMaterial({ color: 0x8a1030, emissive: 0x400010 })); pm.position.copy(W3(x, y, 3)); addExtra(pm); D.objs.push(pm); }
+    const pil = []; for (let i = 0; i < 9; i++) { const x = clamp(e.x + rnd(-700, 700), PAD + 80, W - PAD - 80), y = clamp(e.y + rnd(-420, 420), PAD + 80, H - PAD - 80); B.objs.push({ x, y, r: 70, realm: 1, dream: true }); pil.push(x); const pm = new THREE.Mesh(new THREE.CylinderGeometry(70 * S, 70 * S, 6, 12), new THREE.MeshStandardMaterial({ color: 0x8a1030, emissive: 0x400010 })); pm.position.copy(W3r(x, y, 3)).x += RDX; addExtra(pm); D.objs.push(pm); }
     D.ss.exit = { x: clamp(e.x + (Math.random() < .5 ? -1 : 1) * 900, PAD + 100, W - PAD - 100), y: clamp(e.y + rnd(-300, 300), PAD + 100, H - PAD - 100) };
   }
 }
-function dreamFail(why) { const D = B.dream; if (!D || D.over) return; D.over = true; const e = D.e; ui.pop(P3(e, 4.4), '💀 ' + why, '#ff6a8a', true); ui.flash('#000', 1, .9); dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); e.st.inv = 0; e.shield = 0; if (D.f) D.f.nofoe = false; hurt(D.f, e, 999999, { quiet: true, field: true }); B.dream = null; }
-function dreamWin() { const D = B.dream; if (!D) return; dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); ui.flash('#fff', .8, .8); ui.pop(P3(D.e, 4.4), '꿈에서 깨어났다…', '#ffffff', true); D.e.st.stun = 2; D.f.nofoe = false; B.dream = null; }
+function dreamReturn(D) { const e = D.e; e.realm = 0; e.x = D.ret.x; e.y = D.ret.y; B.viewSeal = false; camState.init = false; world.setDream(0); }
+function dreamFail(why) { const D = B.dream; if (!D || D.over) return; D.over = true; const e = D.e; dreamReturn(D); ui.pop(P3(e, 4.4), '💀 ' + why, '#ff6a8a', true); ui.flash('#000', 1, .9); dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); e.st.inv = 0; e.shield = 0; if (D.f) D.f.nofoe = false; hurt(D.f, e, 999999, { quiet: true, field: true }); B.dream = null; }
+function dreamWin() { const D = B.dream; if (!D) return; dreamReturn(D); dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); ui.flash('#fff', .8, .8); ui.pop(P3(D.e, 4.4), '꿈에서 깨어났다…', '#ffffff', true); D.e.st.stun = 2; D.f.nofoe = false; B.dream = null; }
 function updDream(dt) {
   const D = B.dream; if (!D) return; const e = D.e, f = D.f; D.t += dt;
-  if (e.hp <= 0 || f.hp <= 0) { f.nofoe = false; if (f.hp <= 0 && e.hp > 0) { dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); B.dream = null; return; } dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); B.dream = null; return; }
+  if (e.hp <= 0 || f.hp <= 0) { dreamReturn(D); f.nofoe = false; if (f.hp <= 0 && e.hp > 0) { dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); B.dream = null; return; } dreamClear(); B.objs = B.objs.filter(o => !o.dream); ui.tint(''); B.dream = null; return; }
   const ss = D.ss; D.mv = null;
   if (D.stage === 1) {
     const dur = 20, k = Math.min(1, D.t / dur); ss.water.position.y = -3 + k * 3.2; const safe = ss.isl.some(i => Math.hypot(e.x - i.x, e.y - i.y) < i.r);
@@ -2667,7 +2677,7 @@ function updDream(dt) {
   } else if (D.stage === 5) {
     ss.life -= dt; const cl = ss.clone;
     if (ss.phase === 0) {   // 1) 분신 처치
-      if (cl.hp <= 0) { ss.phase = 1; ui.toast('🧩 미로: 붉은 문(출구)까지 가세요'); ss.exitD = vfx.decal(P3(ss.exit), { tex: 'ring', r: 120 * S, color: 0xff3050, alpha: .95, y: .1 }); D.pend = ss.exitD; }
+      if (cl.hp <= 0) { ss.phase = 1; ui.toast('🧩 미로: 붉은 문(출구)까지 가세요'); ss.exitD = vfx.decal(P3({ x: ss.exit.x, y: ss.exit.y, realm: 1 }), { tex: 'ring', r: 120 * S, color: 0xff3050, alpha: .95, y: .1 }); D.pend = ss.exitD; }
     } else if (ss.phase === 1) {   // 2) 미로 — 기둥 사이로 출구까지
       if (!D.human) { const a = Math.atan2(ss.exit.y - e.y, ss.exit.x - e.x); D.mv = { mx: Math.cos(a), my: Math.sin(a) }; }
       if (Math.hypot(e.x - ss.exit.x, e.y - ss.exit.y) < 120) { ss.phase = 2; ss.t2 = 0; ui.toast('🔐 방탈출: 4자리 자물쇠를 푸세요'); if (D.human) {
@@ -3330,6 +3340,7 @@ function tryUse(f, k) {
 /* ================= 업데이트 ================= */
 function updFighter(f, dt) {
   if (B.explore && f.hp <= 0) return;
+  if (f.minion && f.hp <= 0 && (f.illu || f.dreamOf || f.dkking || f.dmob || f.legion)) { f.script = null; f.cast = null; f.act = null; return; }   // 죽은 분신(환각/꿈/병사)은 땅 속에서 공격하지 않는다
   if (f.sealHold) return;
   updCommon(f, dt);
   if (f.def.id === 'silent' && f.form === 'base' && !f.sealSoul && !f.soul && !(f.pseal > 0) && f.hp > 0 && f.hp <= 10000) enterHour(f);
@@ -3413,8 +3424,8 @@ function update(dt) {
   if (B.raid && !B.over) { B.raid.t -= dt; if (B.raid.t <= 0) { B.raid.t = 0; B.over = B.raid.boss; setTimeout(finish, 900); } }
   inR(() => B.fighters.forEach(f => updFighter(f, dt)));
   updBush();
-  for (const m of B.fighters) if (m.legion && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
-  if (B.fighters.some(m => m.gone && m.legion)) { B.fighters.filter(m => m.gone && m.legion).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && m.legion)); }
+  for (const m of B.fighters) if ((m.legion || m.illu || m.dreamOf || m.dkking || m.dmob) && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
+  if (B.fighters.some(m => m.gone)) { B.fighters.filter(m => m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob)).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob))); }
   updFxm(dt); updFire(dt); updLdoms(dt); updMystic(dt); updGold(dt); updLichRain(dt); updDka(dt); updLichA(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
@@ -3619,7 +3630,7 @@ function cleanup() {
   B.fighters.forEach(f => { if (f.drain) endDrain(f); if (f.ldom) endLdom(f, true); }); B.fighters.forEach(removeFighter); B.projs.forEach(killProj);
   B.lakes.forEach(removeLake); B.hexes.forEach(removeHex); B.fighters.forEach(f => f.veil && world.scene.remove(f.veil.group)); B.angels.forEach(a => world.scene.remove(a.g)); B.zones.forEach(z => z.mesh && world.scene.remove(z.mesh));
   B.fighters.forEach(f => { if (f.cast && f.cast.group) world.scene.remove(f.cast.group); }); world.setParadise(false);
-  B.extra.forEach(m => world.scene.remove(m)); B.fire = null; ui.dim(0); ui.glass(false); world.setAbyss(false); if (sealBtn) sealBtn.style.display = 'none';
+  B.extra.forEach(m => world.scene.remove(m)); B.fire = null; ui.dim(0); ui.glass(false); world.setAbyss(false); world.setDream(0); if (sealBtn) sealBtn.style.display = 'none';
   if (B.cut) { if (B.cut.moon) world.scene.remove(B.cut.moon.group); (B.cut.eyes || []).forEach(e => world.scene.remove(e)); if (B.cut.kind === 'burn') B.fighters.forEach(f => { f.root.visible = true; }); }
   B.barriers.forEach(removeBarrier); B.lights.forEach(removeLight); if (B.storm) endStorm(true); world.setStorm(false);
   [...vfx.items].forEach(i => vfx.drop(i));

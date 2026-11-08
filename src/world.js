@@ -102,6 +102,39 @@ export function createWorld(canvas) {
   const mglow = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({ map: tex('glow'), color: 0xff3fc8, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false }));
   mglow.rotation.x = -Math.PI / 2; mglow.position.y = .02; mind.add(mglow);
 
+  /* ----- 꿈 (각성 리치드래곤 궁극기): 본 맵 옆(x+500)에 단계마다 전혀 다른 공간 5개 ----- */
+  const dreamR = new THREE.Group(); dreamR.position.set(500, 0, 0); dreamR.visible = false; scene.add(dreamR);
+  const addMat = (c, o = .5) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false });
+  const DREAMS = [
+    { sky: [0x050c30, 0x1c5aa0, 0x040a20], fog: 0x0c2448, floor: 0x14407a, em: 0x08204a, glow: 0x6ac0ff, stars: true },    // 1 바다
+    { sky: [0x2a0c28, 0xc87a98, 0x3a1830], fog: 0x5a2a40, floor: 0x9a6a5a, em: 0x3a1a1a, glow: 0xffb0c0, stars: false },  // 2 어머니의 방
+    { sky: [0x3a2006, 0xe0983a, 0x241204], fog: 0x5a360e, floor: 0xc88a38, em: 0x4a2a08, glow: 0xffc860, stars: false },  // 3 와플 공장
+    { sky: [0xf0a8d4, 0xffe4f2, 0xe090c0], fog: 0xf0b0d8, floor: 0xffc9e8, em: 0x602a50, glow: 0xff8ad0, stars: false },  // 4 설탕 낙원
+    { sky: [0x0c0002, 0x520610, 0x070001], fog: 0x1a0206, floor: 0x240608, em: 0x300408, glow: 0xff2a3a, stars: true },    // 5 붉은 달
+  ].map((c, i) => {
+    const g = new THREE.Group(); g.visible = false; dreamR.add(g);
+    const dome = skyDome(c.sky[0], c.sky[1], c.sky[2], c.stars); dome.visible = false; g.add(dome);
+    const fl = new THREE.Mesh(new THREE.CylinderGeometry(82, 86, 1.2, 72), new THREE.MeshStandardMaterial({ color: c.floor, roughness: .6, metalness: .2, emissive: c.em })); fl.position.y = -.6; fl.receiveShadow = true; g.add(fl);
+    const ru = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), addMat(c.glow, .3)); ru.material.map = tex('rune'); ru.rotation.x = -Math.PI / 2; ru.position.y = .03; g.add(ru);
+    if (i === 0) {   // 바다: 달과 물결 고리
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(14, 24, 16), new THREE.MeshBasicMaterial({ color: 0xdff0ff })); moon.position.set(-60, 70, -150); g.add(moon);
+      for (let k = 1; k <= 5; k++) { const rg = new THREE.Mesh(new THREE.TorusGeometry(k * 14, .25, 6, 64), addMat(0x9ad8ff, .4)); rg.rotation.x = Math.PI / 2; rg.position.y = .2; g.add(rg); }
+    } else if (i === 1) {   // 어머니의 방: 따뜻한 등불과 떠다니는 하트
+      for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283, h = heartMesh(new THREE.MeshStandardMaterial({ color: 0xff8aa8, emissive: 0xff4a78, emissiveIntensity: .8 }), 1.4); h.position.set(Math.cos(a) * 60, 8 + (k % 3) * 4, Math.sin(a) * 40 - 6); g.add(h); }
+      for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283, l = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffe0a0 })); l.position.set(Math.cos(a) * 75, 14, Math.sin(a) * 48); g.add(l); const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); gl.scale.setScalar(18); gl.position.copy(l.position); g.add(gl); }
+    } else if (i === 2) {   // 와플 공장: 격자 무늬 바닥 + 굴뚝
+      const gm = new THREE.MeshStandardMaterial({ color: 0x8a5018, roughness: .8 });
+      for (let k = -8; k <= 8; k++) { const a = new THREE.Mesh(new THREE.BoxGeometry(160, .5, .7), gm); a.position.set(0, .15, k * 8); g.add(a); const b = new THREE.Mesh(new THREE.BoxGeometry(.7, .5, 160), gm); b.position.set(k * 8, .15, 0); g.add(b); }
+      for (let k = 0; k < 5; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.6, 40, 10), new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: .9 })); const a = k / 5 * 6.283; c.position.set(Math.cos(a) * 95, 20, Math.sin(a) * 60 - 20); g.add(c); }
+    } else if (i === 3) {   // 설탕 낙원: 사탕 기둥
+      for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283, c = new THREE.Mesh(new THREE.ConeGeometry(2.6, 18 + (k % 4) * 6, 6), new THREE.MeshStandardMaterial({ color: k % 2 ? 0xffffff : 0xff8ac8, emissive: 0xff5aa8, emissiveIntensity: .25, flatShading: true })); c.position.set(Math.cos(a) * 80, 9 + (k % 4) * 3, Math.sin(a) * 52 - 8); g.add(c); }
+    } else {   // 붉은 달
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(46, 32, 24), new THREE.MeshBasicMaterial({ color: 0xff2030 })); moon.position.set(0, 80, -170); g.add(moon);
+      const mg = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: 0xff3040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); mg.scale.setScalar(220); mg.position.copy(moon.position); g.add(mg);
+    }
+    return { g, dome, c };
+  });
+
   /* ----- 후처리 ----- */
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -153,6 +186,13 @@ export function createWorld(canvas) {
     setAbyss(on) { abyss.visible = on; abyss.position.x = 500; if (!on) this.viewAbyss(false); },
     viewAbyss(on) { if (this._va === on) return; this._va = on; adome.visible = on; arena.visible = !on; scene.fog.color.set(on ? 0x1a0206 : theme.fog[0]); bloom.strength = on ? .9 : theme.bloom; },
     setSealRealm(on) { sealRealm.visible = on; },
+    // 꿈: n = 1~5 단계 공간 표시(0 이면 전부 숨김). viewDream(true) 면 그 공간의 하늘·안개로 화면을 바꾼다
+    setDream(n) { this._ds = n; this._vdk = -1; dreamR.visible = n > 0; DREAMS.forEach((d, i) => { d.g.visible = i === n - 1; if (i !== n - 1) d.dome.visible = false; }); },
+    viewDream(on) {
+      const k = on ? (this._ds || 0) : 0; if (this._vdk === k) return; this._vdk = k;
+      DREAMS.forEach((d, i) => d.dome.visible = k === i + 1); const c = k ? DREAMS[k - 1].c : null;
+      if (this._va !== true) { arena.visible = !k; scene.fog.color.set(c ? c.fog : theme.fog[0]); bloom.strength = k ? .8 : theme.bloom; }
+    },
     setSeal(on) { this.setMind(on); if (on) scene.fog.color.set(0x06161a); },
     setStorm(on) {
       scene.fog.color.set(on ? 0x3a0510 : theme.fog[0]); scene.fog.density = on ? .012 : theme.fog[1]; hemi.color.set(on ? 0xff5060 : theme.hemi[0]); moonL.color.set(on ? 0xff7080 : theme.moon);

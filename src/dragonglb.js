@@ -27,3 +27,28 @@ export function poseBone(D, name, x, y, z) {
   const b = D.bones[name]; if (!b) return;
   b.quaternion.copy(D.rest[name]).multiply(_q.setFromEuler(_e.set(x, y, z)));
 }
+
+// 리치드래곤 모델의 '머리만' 떼어낸 스킨드 메시 (꿈·안개·종말의 하늘 등에서 거대한 머리로 쓴다).
+// 한 덩어리 스킨드 메시라서, 가장 영향력이 큰 뼈가 Head/눈 뼈인 정점의 삼각형만 남긴 새 지오메트리로 바꿔 끼운다.
+let headCache = null;
+function headGeo(src) {
+  if (headCache) return headCache;
+  const g = src.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, bones = src.skeleton.bones, ok = new Set();
+  bones.forEach((b, i) => { if (/^(Head|R_Eye|L_Eye|Jaw|Tongue|Teeth)/i.test(b.name)) ok.add(i); });
+  const dom = new Uint8Array(si.count);
+  for (let v = 0; v < si.count; v++) { let best = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(v, k); if (w > bw) { bw = w; best = si.getComponent(v, k); } } dom[v] = ok.has(best) ? 1 : 0; }
+  const idx = g.index, keep = []; for (let t = 0; t < idx.count; t += 3) { const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2); if (dom[a] && dom[b] && dom[c]) keep.push(a, b, c); }
+  const ng = new THREE.BufferGeometry(); for (const k in g.attributes) ng.setAttribute(k, g.attributes[k]); ng.setIndex(keep);
+  headCache = { geo: ng, n: keep.length / 3 }; return headCache;
+}
+export function buildDragonHead() {
+  if (!cache) return null;
+  const model = clone(cache); let sm = null; model.traverse(o => { if (o.isSkinnedMesh && !sm) sm = o; }); if (!sm) return null;
+  const h = headGeo(sm); if (h.n < 200) return null;
+  sm.geometry = h.geo; sm.material = sm.material.clone(); sm.material.emissive = new THREE.Color(0x6a28b0); sm.material.emissiveIntensity = .7; sm.frustumCulled = false; sm.castShadow = false;
+  model.updateMatrixWorld(true);
+  const pos = h.geo.attributes.position, v = new THREE.Vector3(), box = new THREE.Box3(); const used = new Set(h.geo.index.array);
+  for (const i of used) { v.fromBufferAttribute(pos, i).applyMatrix4(sm.matrixWorld); box.expandByPoint(v); }
+  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), root = new THREE.Group(); model.position.sub(c); root.add(model);
+  root.userData.size = Math.max(s.x, s.y, s.z); return root;
+}
