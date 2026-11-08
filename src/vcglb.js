@@ -11,6 +11,7 @@ const VC = {
   pva: { url: 'assets/models/pva/pva.glb', h: 2.6 },
   burnA: { url: 'assets/models/burnA/burnA.glb', h: 2.9 },
   dkk: { url: 'assets/models/dkk/dkk.glb', h: 2.8 },
+  gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
 };

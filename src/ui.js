@@ -44,7 +44,7 @@ export function beginBattle(B) {
   const root = $('#hud'); root.innerHTML = ''; pops.forEach(p => p.el.remove()); pops = [];
   hud = { B, panels: [], tags: [] };
   B.fighters.forEach((f, i) => {
-    if (B.explore && i > 0) { addTag(f); return; }
+    if ((B.explore || B.gem) && i > 0) { addTag(f); return; }
     const keys = f.ctrl.kind === 'h2' ? ['7', '8', '9', '0'] : ['Z', 'X', 'C', 'V'];
     const mine = f.ctrl.kind === 'h1' || (f.ctrl.kind === 'h2' && B.mode === 'local');
     const p = document.createElement('div'); p.className = 'hpanel ' + (i ? 'right' : 'left');
@@ -88,8 +88,8 @@ export function update(B, camera, renderer, dt) {
     t.el.style.display = vis ? 'block' : 'none';
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
-    let ic = ''; const s = f.st;
-    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (f.mflame) ic += '🔥'; if (f.noHeal > 0) ic += '💔'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
+    let ic = f.gems ? '💎' + f.gems + ' ' : ''; const s = f.st;
+    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0 || s.charmS > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (f.mflame) ic += '🔥'; if (f.noHeal > 0) ic += '💔'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
     t.ic.textContent = ic;
   }
   for (let i = pops.length - 1; i >= 0; i--) {
