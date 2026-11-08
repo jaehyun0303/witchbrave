@@ -20,7 +20,7 @@ export const MODES = [
   { id: 'gem', title: '3v3 젬그랩', desc: '3 vs 3 젬 모으기', long: '중앙 광산에서 솟는 젬을 모아 팀이 10개를 15초 동안 지키면 승리해요. 쓰러지면 젬을 떨어뜨리고 3.5초 뒤 부활합니다. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '젬 10개 · 15초'], ready: true },
   { id: 'raid', title: '보스 레이드', desc: '4인 협동 보스 처치', long: '곧 열립니다.', chips: ['4인 협동', '보스 처치'], ready: false },
   { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: 'AI 상대와 먼저 3승을 먼저 거두는 쪽이 이겨요. 이기면 코인 500, 져도 150.', chips: ['1 vs 1', '먼저 3승'], ready: true },
-  { id: 'rank', title: '랭크 매치', desc: '3 vs 3 시즌 랭킹', long: '곧 열립니다.', chips: ['3 vs 3', '시즌 랭킹'], ready: false },
+  { id: 'bounty', title: '3v3 바운티', desc: '3 vs 3 별 모으기', long: '적을 쓰러뜨려 별을 모으는 팀 대결이에요. 연속으로 처치하면 내 현상금(최대 ⭐7)이 올라가고, 쓰러지면 1로 돌아갑니다. 2분 15초 동안 별이 더 많은 팀이 승리하고, 쓰러져도 3.5초 뒤 부활해요. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '별 많은 팀 승리'], ready: true },
 ];
 const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   silent: { rar: '비스트', group: '딜러', role: '근접 검사', atk: 62, spd: 55, rng: 25 },
@@ -214,7 +214,11 @@ build.lobby = art => {
   byLabel(art, '설정').onclick = openSettings;
   if (!SAVE.nick && !nickAsked) { nickAsked = true; setTimeout(() => hub.askNick(() => open('lobby'), art), 400); }
   byLabel(art, '프로필').onclick = () => hub.openProfile('info');
-  for (const l of ['채팅', '친구 초대 1', '친구 초대 2', '보석 충전', '코인 충전', '뽑기권 충전']) byLabel(art, l).onclick = l === '코인 충전' || l === '뽑기권 충전' ? () => open('shop') : soon;
+  for (const l of ['채팅', '보석 충전', '코인 충전', '뽑기권 충전']) byLabel(art, l).onclick = l === '코인 충전' || l === '뽑기권 충전' ? () => open('shop') : soon;
+  hub.partyOf().forEach((m, i) => {   // 파티 슬롯: 파티원이 있으면 쿠키 색 + 닉네임을 보여준다
+    const b = byLabel(art, '친구 초대 ' + (i + 1)); b.onclick = () => hub.openParty(i, () => open('lobby'), art); b.title = m ? m.nick + ' · 눌러서 바꾸기' : '파티원 초대';
+    if (m && api.CHARS[m.id]) { const col = '#' + api.CHARS[m.id].color.toString(16).padStart(6, '0'); b.style.background = col; b.innerHTML = '<span style="position:absolute;left:0;top:0;width:100%;line-height:50px;font:700 22px Jua,sans-serif;color:#fff;text-shadow:0 2px 0 #2b1830,0 0 4px #2b1830">' + m.nick[0] + '</span><span style="position:absolute;left:-12px;top:58px;width:80px;font:700 12px Jua,sans-serif;color:#2b1830;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + m.nick + '</span>'; }
+  });
 };
 
 /* ---------- 모드 선택 ---------- */

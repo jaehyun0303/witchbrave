@@ -47,6 +47,30 @@ export function askNick(done, parent) {
     SV().nick = v; ctx.api.persist(); o.remove(); ctx.toast('닉네임: ' + v); if (done) done();
   };
 }
+/* ---------- 파티 (로비의 + 슬롯 2개) ----------
+   서버가 없어서 친구 초대는 아직 못 하고, 3v3 모드(젬그랩·바운티)에 같이 나갈 AI 동료 쿠키를 고른다. 저장: SAVE.party = [{id, nick} | null, ...] */
+const PARTY_NICKS = ['달콤이', '초코칩', '바삭이', '말랑이', '쫀득이', '캐러멜', '마카롱', '와플', '푸딩', '젤리빈', '솜사탕', '별사탕'];
+export const partyOf = () => { const S = SV(); S.party = S.party || [null, null]; return S.party; };
+export function openParty(slot, done, parent) {
+  const S = SV(), api = ctx.api, P = partyOf(), cur = P[slot];
+  const o = document.createElement('div'); o.style.cssText = 'position:absolute;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50';
+  const ids = api.ORDER.filter(id => id !== 'brave').concat(['brave']);
+  o.innerHTML = '<div style="width:760px;max-height:620px;overflow:auto;padding:24px;border:4px solid #2b1830;border-radius:22px;background:#fff3df;text-align:center;font-family:Jua,sans-serif;color:#2b1830">'
+    + '<div style="font-size:30px">파티원 ' + (slot + 1) + ' · AI 동료</div>'
+    + '<div style="font-size:15px;color:#6b4a63;margin:4px 0 12px">친구 초대(온라인)는 서버가 열리면 가능해요. 지금은 3v3 모드(젬그랩·바운티)에 같이 나갈 동료 쿠키를 고를 수 있어요.</div>'
+    + '<div style="margin-bottom:12px">동료 닉네임 <input id="pnick" maxlength="10" style="width:200px;padding:6px 10px;border:3px solid #2b1830;border-radius:10px;font:inherit;font-size:18px" value="' + (cur ? cur.nick : PARTY_NICKS[Math.floor(Math.random() * PARTY_NICKS.length)]) + '"></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">' + ids.map(id => { const c = api.CHARS[id], sel = cur && cur.id === id; return '<button data-id="' + id + '" style="padding:10px 4px;border:3px solid #2b1830;border-radius:14px;background:' + (sel ? '#ffe28a' : '#fff') + ';box-shadow:0 3px 0 #2b1830;font:inherit;font-size:16px;cursor:pointer;color:#2b1830"><b style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#' + c.color.toString(16).padStart(6, '0') + ';border:2px solid #2b1830;vertical-align:-2px;margin-right:6px"></b>' + c.name.replace(' 쿠키', '') + '</button>'; }).join('') + '</div>'
+    + '<div style="margin-top:14px;display:flex;gap:10px;justify-content:center"><button id="prm" style="padding:10px 22px;border:3px solid #2b1830;border-radius:14px;background:#ffb3b3;font:inherit;font-size:18px;cursor:pointer">파티원 비우기</button><button id="pno" style="padding:10px 22px;border:3px solid #2b1830;border-radius:14px;background:#fff;font:inherit;font-size:18px;cursor:pointer">닫기</button></div></div>';
+  (parent || root || document.body).appendChild(o);
+  const close = () => { o.remove(); if (done) done(); };
+  o.querySelector('#pno').onclick = () => o.remove();
+  o.querySelector('#prm').onclick = () => { P[slot] = null; api.persist(); ctx.toast('파티원을 비웠어요'); close(); };
+  o.querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
+    const v = o.querySelector('#pnick').value.trim() || PARTY_NICKS[0];
+    if (v.length > 10 || !/^[가-힣A-Za-z0-9_ ]+$/.test(v)) { ctx.toast('닉네임은 10글자 이하 한글·영문·숫자만 가능해요'); return; }
+    P[slot] = { id: b.dataset.id, nick: v }; api.persist(); ctx.toast(v + ' (' + api.CHARS[b.dataset.id].name + ') 파티 합류!'); close();
+  });
+}
 export function H() {
   const S = SV(), h = S.hub = S.hub || {};
   h.shards ??= 0; h.pity ??= 0; h.pv ??= 0;

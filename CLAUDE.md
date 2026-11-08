@@ -111,3 +111,11 @@
 - game.js `setupGem/updGem/gemTarget/gemEnd` (startBattle 위). 팀 20(우리: 나+AI 2) vs 21(AI 3), 중앙 광산에서 4초마다 젬, 10개를 15초 지키면 승리, 180초 후 젬 많은 팀(동률이면 체력합). 사망 시 젬 드롭·3.5초 뒤 기지 부활(무적 2초). AI는 적이 700 밖이면 젬으로 이동(aiInput). HUD 는 #gemhud(updGem 이 만듦), 내 패널만 표시(ui.beginBattle 에서 B.gem 이면 i>0 은 태그만). 점령/제거 모드는 아직 없음(모드 선택 화면 카드는 6개 고정 → rank/online 슬롯 재사용).
 - 리치드래곤 V: 일반(f.awake false)=거대 얼굴+하트비(startLichRain/updLichRain, 40발·개당150=6000, 맞으면 st.charmS 5초: hurt() 에서 공격이 아군/자기 자신으로 리다이렉트), 각성(f.awake)=변신.
 - 골드치즈 V 는 컷신(act 3.2초, f.air 상승, 하늘 창 60개) 후 f.rain 시작.
+
+## 3v3 바운티 · 닉네임 · 파티 · 각성 다크카카오 (5차)
+- **성능(젬그랩)**: 젬 메시의 PointLight 제거(조명 개수 변화 → 전 재질 셰이더 재컴파일이 렉의 주범), 지오메트리/재질 공유, 젬 최대 16개, HUD innerHTML 는 문자열이 바뀔 때만, 3v3 에서 AI 모델은 그림자 끔, 3v3 에선 자동 품질 하락 임계값을 .026(≈38fps)로. **브라우저 패널이 숨겨져 있으면 페이지 로딩이 멈춤**(`show_pane preview` 로 보이게 해야 테스트 가능).
+- **바운티** (mode 'bounty', MODES 의 'rank' 슬롯): `B.gem` 을 `kind:'bounty'` 로 공유(젬그랩과 같은 setupGem/updGem). 처치하면 그 쿠키의 현상금 `f.bty`(시작 1, 연속 처치마다 +1 최대 7, 죽으면 1) 만큼 팀 점수(`G.cnt`), 135초(`BTY_TIME`), 별 많은 팀 승리(동률이면 체력합), 3.5초 뒤 부활. 처치자는 `hurt` 가 기록하는 `t.lastAtk`(10초 이내)로 판정. 규칙 일부(시작 현상금 1, 시간 2:15)는 내 기억 기반 임시값.
+- **닉네임**: `f.nick` — 나는 `SAVE.nick`, AI 는 `aiNick()`. 전투 태그(`.tag3d .nm`)에 표시, 팀 모드에선 아군은 `▼ 아군 · ` + 초록 이름·초록 체력바, 적은 빨강. 젬/바운티 발밑 고리 색: 아군 초록(`GEM_COL`), 적 빨강.
+- **파티**: 로비의 '친구 초대 1/2' 버튼 = 파티 슬롯 (`hub.openParty`). 서버가 없어서 친구 대신 **AI 동료 쿠키 + 닉네임**을 고른다(`SAVE.party=[{id,nick}|null,..]`). `setupGem` 이 파티원이 있으면 그 쿠키로 아군을 구성(없으면 랜덤). 온라인 초대는 서버 필요.
+- **각성 다크카카오 쿠키** (`CHARS.dkkA`, `base:'dkk'`, `CHARS.dkk.awakeId`, HP 35000, 모델 `dkkA` vcglb h 3.0, g=240 베이크 15MB): 원본 glb 에 없던 한쪽 팔은 남은 팔의 정점 영역(`mirror_arm` 스크립트의 박스, 검 제외)을 x 반전해 붙임. **패시브 봉인**: `sealOn(t,src)` → `t.pseal`(10초, `updCommon` 이 감소). 봉인 훅: pva·mystic 면역(`immune`/`updCommon`), 미스틱 펫·오라(`updMystic`), 골드치즈 `dmgMul`, 어둠마녀 흡수(`dk`)·유도(a 의 homing), 버닝스파이스 불사/괴수화, 사일런트솔트 침묵의 때. a 용군주의 참격 1000(쿨 2.6, 검기+흑룡/백룡 `kind:'dkdrag'`) / z 용군주의 일격 돌진 400 + 점프 가르기 2000 / x 영역 가르기 4000(R 1100, `breakDomains`·`endLdom`·`endSteamer`·`endMind`·`endAbyss`·`endSeal`, 5초 디버프 면역 `f.dimm`) / c 국왕: 함선 2척(`B.dks`, 각 2000, 정박 후 병사 `mob_dkk` 6명씩 1800HP·16초) / v 드래곤 네메시스(`B.nem`, 컷신 3.4초 + 용 2마리 맵 순회, 번개 8번×837.5=6700, 감전 `f.shock` 9초·3초마다 기절 0.8).
+- 임시 스크립트(`scripts/_*`)는 저장소에 올리지 않는다.

@@ -52,16 +52,16 @@ export function beginBattle(B) {
       <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><div class="shfill"></div><span class="hptxt"></span></div>
       ${mine ? `<div class="skills">${['z', 'x', 'c', 'v', 'q', 'r'].filter(k => f.def.skills.base[k]).map((k, j) => `<div class="slot" data-k="${k}"><i>${f.ctrl.kind === 'h2' ? { z: '7', x: '8', c: '9', v: '0', q: '6', r: '-' }[k] : k.toUpperCase()}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
     root.appendChild(p);
-    const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="mini"><div></div></div><div class="ic"></div>'; root.appendChild(tag);
+    const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="nm"></div><div class="mini"><div></div></div><div class="ic"></div>'; root.appendChild(tag);
     hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), sh: p.querySelector('.shfill'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
-    hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic') });
+    hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic'), nm: tag.querySelector('.nm') });
   });
 }
 
 export function addTag(f) {
   if (!hud || hud.tags.some(t => t.f === f)) return;
-  const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="mini"><div></div></div><div class="ic"></div>'; $('#hud').appendChild(tag);
-  hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic') });
+  const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="nm"></div><div class="mini"><div></div></div><div class="ic"></div>'; $('#hud').appendChild(tag);
+  hud.tags.push({ f, el: tag, bar: tag.querySelector('.mini div'), ic: tag.querySelector('.ic'), nm: tag.querySelector('.nm') });
 }
 
 export function update(B, camera, renderer, dt) {
@@ -88,8 +88,10 @@ export function update(B, camera, renderer, dt) {
     t.el.style.display = vis ? 'block' : 'none';
     t.el.style.transform = `translate(${(v3.x * .5 + .5) * w}px,${(-v3.y * .5 + .5) * h}px) translate(-50%,-100%)`;
     t.bar.style.width = Math.max(0, f.hp / f.max) * 100 + '%';
-    let ic = f.gems ? '💎' + f.gems + ' ' : ''; const s = f.st;
-    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0 || s.charmS > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (f.mflame) ic += '🔥'; if (f.noHeal > 0) ic += '💔'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
+    let ic = (f.gems ? '💎' + f.gems + ' ' : '') + (f.bty ? '⭐' + f.bty + ' ' : ''); const s = f.st;
+    const me = B.fighters[0], isAlly = f !== me && f.team !== undefined && f.team === me.team;   // 아군은 이름 앞 ▼ 표시 + 초록 체력바
+    if (t.nmv !== f.nick || t.ally !== isAlly) { t.nmv = f.nick; t.ally = isAlly; t.nm.textContent = (isAlly ? '▼ 아군 · ' : '') + (f.nick || ''); t.nm.style.color = f === me ? '#ffe066' : isAlly ? '#6dff8a' : '#ff9a9a'; t.bar.style.background = isAlly || (f === me && me.team !== undefined) ? '#4be36a' : ''; t.el.querySelector('.mini').style.borderColor = isAlly ? '#2fbf4a' : ''; }
+    if (s.slow > 0) ic += '🐌'; if (s.silence > 0) ic += '🔇'; if (s.charm > 0 || s.charmS > 0) ic += '💘'; if (s.stun > 0) ic += '💫'; if (s.lock > 0) ic += '⛓'; if (s.cdfreeze > 0) ic += '⏳'; if (f.mflame) ic += '🔥'; if (f.noHeal > 0) ic += '💔'; if (s.ctl > 0) ic += '🧠'; if (s.rev > 0) ic += '🔄'; if (f.pseal > 0) ic += '🔒'; if (f.shock > 0) ic += '⚡'; if (f.soul) ic += '👻'; else if (f.ult && f.ult.armed) ic += '✨';
     t.ic.textContent = ic;
   }
   for (let i = pops.length - 1; i >= 0; i--) {
