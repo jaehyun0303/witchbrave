@@ -123,8 +123,12 @@ function projVisual(p) {
     fl.add(new THREE.Mesh(new THREE.SphereGeometry(.35, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe066 })));
     fl.scale.setScalar(p.r * S * 3.2); g.add(fl); g.userData.mesh = fl; glow.scale.setScalar(p.r * S * 11);
   }
-  if (p.kind === 'flour') {   // 미스틱플라워의 밀가루 뭉치
-    const fm = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xfffaf0, roughness: 1, emissive: 0xcfc8b0, emissiveIntensity: .35, flatShading: true })); fm.scale.setScalar(p.r * S * 2.2); g.add(fm); g.userData.mesh = fm; glow.scale.setScalar(p.r * S * 8);
+  if (p.kind === 'flour') {   // 미스틱플라워의 밀가루: 고운 가루 입자가 뭉쳐 날아간다
+    const N = 140, pos = new Float32Array(N * 3), R = p.r * S * 2.2;
+    for (let i = 0; i < N; i++) { const u = Math.random(), v = Math.random(), th = u * 6.283, ph = Math.acos(2 * v - 1), rr = R * Math.pow(Math.random(), .6); pos[i * 3] = rr * Math.sin(ph) * Math.cos(th); pos[i * 3 + 1] = rr * Math.sin(ph) * Math.sin(th) * .8; pos[i * 3 + 2] = rr * Math.cos(ph) * 1.2; }
+    const gm = new THREE.BufferGeometry(); gm.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const fm = new THREE.Points(gm, new THREE.PointsMaterial({ color: 0xfffaf0, size: .16, sizeAttenuation: true, transparent: true, opacity: .9, depthWrite: false }));
+    g.add(fm); g.userData.mesh = fm; glow.scale.setScalar(p.r * S * 6);
   }
   if (p.kind === 'axe') {   // 버닝스파이스의 도끼: 불타며 회전
     const ax = new THREE.Group(), hm = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: .6 }), bm = new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0xff5a10, emissiveIntensity: 1.4, metalness: .5, roughness: .3 });
@@ -153,7 +157,7 @@ function updProjs(dt) {
       if (p.kind === 'heart') { p.vis.userData.mesh.rotation.y += dt * 8; p.vis.userData.mesh.rotation.z = Math.sin(B.time * 14) * .3; }
       if (p.kind === 'axe') p.vis.userData.mesh.rotation.x += dt * 20;
       if (p.kind === 'flower') p.vis.userData.mesh.rotation.z += dt * 9;
-      if (p.kind === 'flour') { p.vis.userData.mesh.rotation.x += dt * 7; p.vis.userData.mesh.rotation.y += dt * 5; }
+      if (p.kind === 'flour') { const fm = p.vis.userData.mesh; fm.rotation.x += dt * 3; fm.rotation.y += dt * 2.4; fm.scale.setScalar(1 + Math.sin(B.time * 18) * .08); }
       if (p.kind === 'wave') p.vis.userData.mesh.material.opacity = .9 + Math.sin(B.time * 30) * .1;
     }
     // 궤적 파티클
@@ -2346,7 +2350,7 @@ CHARS.mystic = {
   passive: '정신계·디버프에 면역입니다. 주변의 원형 영역은 따라다니며, 안의 아군은 (정신계 제외) 디버프에 면역입니다.',
   skills: {
     base: {
-      a: { name: '밀가루 뭉치', cd: .6, desc: '거대한 밀가루 뭉치를 발사한다 200. 맞으면 허무 스택 +1', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 780, r: 24, dmg: 200, color: 0xffffff, kind: 'flour', life: 1.3, onHit: t => voidOn(t, f, 1) }); } },
+      a: { name: '밀가루 뭉치', cd: .6, desc: '고운 밀가루 가루 뭉치를 발사한다 200. 맞으면 허무 스택 +1', use(f) { setAnim(f, 'cast', .25); shoot(f, { a: f.face, sp: 780, r: 24, dmg: 200, color: 0xffffff, kind: 'flour', life: 1.3, onHit: t => voidOn(t, f, 1) }); } },
       z: { name: '연꽃 폭발', cd: 12, desc: '노란 연꽃이 피며 펑 터진다 2000. 범위 안의 아군과 나를 1000 회복', use(f, p) {
         setAnim(f, 'cast', .4); const q = clampRange(f, p, 650); lotusFx(q.x, q.y, 260, .7);
         zone(f, { x: q.x, y: q.y, r: 260, delay: .7, dmg: 2000, color: LOTUS, onHit: t => { if (ally(f, t)) mHeal(t, 1000); }, onSelf: t => mHeal(t, 1000) });
