@@ -334,8 +334,9 @@ const realmS = () => B && (B.seal || (B.abyss && !B.abyss.done ? B.abyss : null)
 const viewRealm = () => { const s = realmS(); return !!(s && (B.fighters[0] === s.target || B.viewSeal)); };
 function gameCamPose() {
   let a, b; if (viewRealm()) a = b = realmS().target; else { const main = B.fighters.filter(o => !o.minion && !o.realm); a = main[0] || B.fighters[0]; b = main[1] || a; } const sep = dist(a, b) * S;
-  const tgt = cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
-  const big = (a.cutV || b.cutV ? 1.7 : 1) * (a.form === 'angel' || b.form === 'angel' ? 3 : 1) * (B.lfaces && B.lfaces.length || (B.lfogs && B.lfogs.some(g => g.head.length)) ? 1.55 : 1) * (a.form === 'dragon' || b.form === 'dragon' ? 1.9 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
+  const cv = a.cutV ? a : b.cutV ? b : null;   // 컷신 중에는 시전자(공중에 떠 있어도)를 화면 중앙에 고정해서 따라간다
+  const tgt = cv ? P3(cv, 1 + (cv.air || 0) * .85) : cam.fit && a !== b ? W3((a.x + b.x) / 2, (a.y + b.y) / 2, 1) : P3(a, 1);
+  const big = (a.cutV || b.cutV ? 2.1 : 1) * (a.form === 'angel' || b.form === 'angel' ? 3 : 1) * (B.lfaces && B.lfaces.length || (B.lfogs && B.lfogs.some(g => g.head.length)) ? 1.55 : 1) * (a.form === 'dragon' || b.form === 'dragon' ? 1.9 : 1) * (a.big || b.big ? 1.9 : 1) * (a.boss > 0 || b.boss > 0 ? 1.7 : 1);
   const d = cam.dist * big + (cam.fit ? sep * .45 : 0), cp = Math.cos(cam.pitch);
   return { pos: tgt.clone().add(new THREE.Vector3(Math.sin(cam.yaw) * cp * d, Math.sin(cam.pitch) * d, Math.cos(cam.yaw) * cp * d)), look: tgt, fov: 42 };
 }
@@ -3491,7 +3492,7 @@ CHARS.gold = {
           const t = u * 3.2; f.face = a0; f.pose = 'raise'; f.air = 15 * Math.min(1, t / 1.1) * (t > 2.7 ? Math.max(0, 1 - (t - 2.7) / .5) : 1);   // 하늘로 날아올랐다가 내려온다
           const c = P3(f, 0);
           while (made < 60 && t >= .9 + made * .03) {   // 하늘에 금빛 창이 하나씩 생겨난다
-            const a = rnd(0, 6.283), d = rnd(4, 20), m = goldSpear(5, .12); m.position.set(c.x + Math.cos(a) * d, 12 + rnd(0, 6), c.z + Math.sin(a) * d); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize()); m.userData.dir = new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize(); m.scale.setScalar(.01); addExtra(m); sky.push({ m, k: 0 }); made++;
+            const a = rnd(0, 6.283), d = rnd(9, 24), m = goldSpear(3.6, .09); m.position.set(c.x + Math.cos(a) * d, 4 + rnd(0, 8), c.z + Math.sin(a) * d); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize()); m.userData.dir = new THREE.Vector3(Math.cos(a0) * .6, -1, Math.sin(a0) * .6).normalize(); m.scale.setScalar(.01); addExtra(m); sky.push({ m, k: 0 }); made++;
             vfx.burst('glow', m.position.clone(), 3, { speed: 1, life: .4, size: .8, c0: 0xffffff, c1: GLD });
           }
           for (const s of sky) { s.k = Math.min(1, s.k + dt * 4); s.m.scale.setScalar(s.k); s.m.position.y += Math.sin(t * 6 + s.m.position.x) * dt * .6; }
