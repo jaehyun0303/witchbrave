@@ -39,8 +39,12 @@ const foe = f => { let best = null, bd = 1e18; for (const o of B.fighters) { if 
 
 /* ================= 데미지 / 상태 ================= */
 const dmgMul = f => (f.pm || 1) * (f.st.lightBuff > 0 ? 1.25 : 1) * (f.mindBuff ? 1.05 : 1) * (f.form === 'dragon' ? 1.1 : 1) * (f.soul ? .25 : 1) * (f.form === 'hour' ? 1.3 : 1) * (f.sealSoul ? .5 : 1) * (f.bigSword > 0 ? 3 : 1) * (1 - Math.min(.5, (f.voidP || 0) * .1)) * (f.def.id === 'gold' && !(f.pseal > 0) ? 2 - Math.max(0, f.hp) / f.max : 1);
-const defRed = f => Math.min(.95, (f.mindBuff ? .05 : 0) + (f.giant > 0 ? .35 : 0) + (f.def.id === 'burnA' && f.form === 'beast' ? .55 + (f.molt || 0) * .01 : 0));   // 불지네 괴수화: 받는 피해 45% (필멸의 탈피 스택마다 1%p 추가 감소)
+const defRed = f => Math.min(.95, (f.dscale > 0 ? .7 : 0) + (f.inPF ? .3 : 0) + (f.mindBuff ? .05 : 0) + (f.giant > 0 ? .35 : 0) + (f.def.id === 'burnA' && f.form === 'beast' ? .55 + (f.molt || 0) * .01 : 0));   // 불지네 괴수화: 받는 피해 45% (필멸의 탈피 스택마다 1%p 추가 감소)
 const spdMul = f => (f.spdBoost || 1) * (f.mindBuff ? 1.15 : 1) * (f.form === 'dragon' ? 1.1 : 1);
+function troRec(win) {   // 이기면 트로피 획득, 지면 잃는다 (캐릭터별, 0 미만으로는 안 내려감)
+  const id = B.fighters[0].def.base || B.fighters[0].def.id, b = (SAVE.tro && SAVE.tro[id]) || 0; ui.recordMatch(SAVE, id, win); const a = SAVE.tro[id] || 0, d = a - b;
+  return `  ·  🏆 ${d >= 0 ? '+' : ''}${d} (${a})`;
+}
 const toast = (f, t) => { if (f.ctrl.kind !== 'ai') ui.toast(t); };
 const shake = (a, t = .3) => { B.shake = Math.max(B.shake, a); B.shakeT = Math.max(B.shakeT, t); };
 
@@ -60,6 +64,7 @@ function hurt(src, t, n, o = {}) {
   if (src && src !== t && B.barriers.length && inBarrier(src, t)) { if (!o.quiet) ui.pop(P3(t, 2.6), '막힘!', '#fff3b0'); return; }
   if (t.holy > 0 && src && src !== t && !ally(src, t) && !o.refl) { if (!o.quiet || Math.random() < .2) ui.pop(P3(t, 2.6), '🛡 반사!', '#ffd0dc'); if (src.hp > 0) hurt(t, src, n * .5, { refl: true, quiet: true, field: true }); return; }   // 베리 홀리: 막고 절반을 반사
   let d = n * (src ? dmgMul(src) : 1) * (1 - defRed(t));
+  if (t.dscale > 0 && src && src !== t && !ally(src, t) && !o.refl && !o.charmR) hurt(t, src, n * .4, { refl: true, quiet: true, field: true });   // 용의 비늘: 같은 공격이 40% 로 되돌아간다
   d = hbHurtAdjust(t, src, d, o); if (t.tdeb > 0) d *= 1.1;   // 시간지기의 평타: 받는 피해 +10%   // 홀리베리: z 피해 감소 / v 불굴(자신 85%, 아군 40% + 대신 맞기)
   if (t.drT > 0) d *= 1 - t.drV;
   if (t.cocoon) { const c = t.cocoon; c.hp -= d; t.cmb = B.time; if (src && src !== t) src.cmb = B.time; ui.pop(P3(t, 2.6), '🕸 ' + Math.round(d), '#e8e8f0'); c.mesh.scale.setScalar(1.12); setTimeout(() => c.mesh && c.mesh.scale.setScalar(1), 80); if (c.hp <= 0) cocoonBreak(t); return; }
@@ -70,6 +75,7 @@ function hurt(src, t, n, o = {}) {
   const pierce = dk ? d * .1 : 0; if (dk) d -= pierce;
   let hpD = d; if (t.shield > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; hpD = d - ab; }
   t.hp = Math.max(0, t.hp - hpD - pierce); t.flash = .12; d += pierce; t.cmb = B.time; if (src && src !== t) src.cmb = B.time;
+  if (d > 0 && src && src !== t && !ally(src, t) && B.pfields && B.pfields.length) { const pf = B.pfields.find(p => p.owner.hp > 0 && (p.owner === t || ally(p.owner, t)) && realmOf(p.owner) === realmOf(t) && Math.hypot(t.x - p.x, t.y - p.y) < p.R); if (pf) { t.shield = (t.shield || 0) + d; t.shieldMax = Math.max(t.shieldMax || 0, t.shield); if (!o.quiet || Math.random() < .2) ui.pop(P3(t, 3.2), '🛡 +' + Math.round(d), '#ffc0e0'); } }   // 용언의 보호막: 맞은 만큼 보호막
   if (d > 0 && !t.minion) { const L = t.dmgLog || (t.dmgLog = []); L.push([B.time, d]); while (L.length && L[0][0] < B.time - 60) L.shift(); }   // 최근 1분 받은 피해 기록 (시간의 장판)
   if (B.raid && t === B.raid.boss && src === B.fighters[0]) B.raid.dmg += d;
   if (src && src !== t && !o.refl15 && !o.refl) {   // 빛의 아공간: 안에서 공격한 적은 준 피해의 15%를 되돌려 받는다
@@ -3112,6 +3118,95 @@ CHARS.timekeeper = {
     }
   }
 };
+/* ===== 용과드래곤 쿠키 (id 'pitaya', 드래곤 등급, HP 34000) — 변신은 각성 후(미구현) ===== */
+const PTY = 0xff5aa8;
+function pitFace() {   // 반투명한 용 얼굴의 형체
+  const hd = buildDragonHead(); const w = new THREE.Group();
+  if (hd) { hd.scale.setScalar(5.5 / Math.max(.5, hd.userData.size)); hd.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = .5; o.material.depthWrite = false; o.material.emissive = new THREE.Color(0xff3a90); o.material.emissiveIntensity = .9; } }); w.add(hd); }
+  else w.add(buildLichFace());
+  return w;
+}
+function startPitBreath(f) {   // Z: 반투명한 용 얼굴이 나타나 10초 동안 긴 브레스 (총 5000)
+  if (f.pbr) return false; setAnim(f, 'breath', 10); const face = pitFace(); face.scale.setScalar(.01); addExtra(face);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xff5aa8, transparent: true, opacity: .4, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); addExtra(cone);
+  f.pbr = { t: 0, dur: 10, tick: 0, face, cone }; f.rooted = true; ui.flash('#ff5aa8', .4, .4); shake(.8, .5); ui.pop(P3(f, 4.4), '🐉 용의 브레스!', '#ffc0e0', true);
+}
+function endPitBreath(f) { const b = f.pbr; if (!b) return; rmExtra(b.face); rmExtra(b.cone); f.pbr = null; f.rooted = false; f.cd.z = 20; }
+function pitaDash(f) {   // C: 드라코닉 대쉬 — 돌진 1500 + 베어 날리기 2000 + 브레스 3000 = 6500 (미니 컷신)
+  const e = foe(f); if (!e || e === B.ghost || e.hp <= 0 || dist(f, e) > 1000) { toast(f, '사거리 밖'); return false; }
+  setAnim(f, 'slash', .4); f.st.inv = Math.max(f.st.inv, 3); let st = 0, t0 = 0, sl = false, br = false; const bb = B, T = 3;
+  act(f, T, (u, dt) => {
+    const t = u * T, a = ang(f, e);
+    if (st === 0) {
+      f.face = a; f.x = clamp(f.x + Math.cos(a) * 2800 * dt, PAD, W - PAD); f.y = clamp(f.y + Math.sin(a) * 2800 * dt, PAD, H - PAD); vfx.emit('glow', { x: P3(f).x, y: 1.3, z: P3(f).z, life: .4, s0: 1.6, s1: 0, c0: 0xffffff, c1: PTY, a: .7, drag: 0 });
+      if (e.hp > 0 && dist(f, e) < f.r + e.r + 80) { st = 1; t0 = t; hurt(f, e, 1500, { dir: a }); e.kb = { vx: Math.cos(a) * 1700, vy: Math.sin(a) * 1700, t: .5 }; f.cutV = true; ui.cinema(true); ui.title(f.def.name, '드라코닉 대쉬'); ui.flash('#ffffff', .5, .4); shake(1.4, .5); B.hitstop = Math.max(B.hitstop, .1); }
+      else if (t > .9) st = 3;
+    } else if (st === 1) {
+      if (t - t0 > .55 && !sl) { sl = true; f.x = clamp(e.x - Math.cos(f.face) * 120, PAD, W - PAD); f.y = clamp(e.y - Math.sin(f.face) * 120, PAD, H - PAD); f.face = ang(f, e); setAnim(f, 'slash', .4); const p = P3(e, 1); vfx.slashGround(p, Math.PI / 2 - f.face, { len: 20, color: 0xffffff, from: 1, dur: .5 }); vfx.slashGround(p, Math.PI / 2 - f.face, { len: 20, color: PTY, from: -1, dur: .5 }); if (e.hp > 0) hurt(f, e, 2000, { dir: f.face }); shake(1.6, .5); ui.flash('#ffd0e8', .5, .4); }
+      if (t - t0 > 1.15 && !br) { br = true; setAnim(f, 'breath', .8); const a2 = ang(f, e), p = P3(f, 1.4); vfx.burst('glow', p, 90, { speed: 10, speed2: 30, life: .9, size: 1.4, c0: 0xffffff, c1: PTY }); vfx.column(P3(e), { r: 5, h: 40, dur: .6, color: PTY, alpha: .8 }); vfx.ring(P3(e), { r0: 1, r1: 14, dur: .7, color: PTY }); ui.flash('#ff5aa8', .7, .6); shake(2.2, .7);
+        for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f) && dist(o, e) < 320 + o.r) hurt(f, o, 3000, { dir: a2 }); }
+      if (t - t0 > 2) st = 3;
+    }
+  }, () => { f.cutV = false; f.st.inv = 0; if (B === bb) { ui.cinema(false); ui.title('', ''); } });
+}
+function pitDragonDash(f) {   // Q (용언의 보호막 안에서만): 용의 형상으로 돌진 2000
+  if (!f.inPF) { toast(f, '용언의 보호막 안에서만 쓸 수 있습니다'); return false; }
+  const a = f.face, hit = new Set(); let mv = 0; const L = 700, sp = 2000, d = dkaDragon(true); d.scale.setScalar(1.8); addExtra(d); setAnim(f, 'slash', .3);
+  act(f, L / sp + .3, (u, dt) => {
+    const st = Math.min(L - mv, sp * dt); mv += st; f.x = clamp(f.x + Math.cos(a) * st, PAD, W - PAD); f.y = clamp(f.y + Math.sin(a) * st, PAD, H - PAD); const p = P3(f, 1.4); d.position.copy(p); d.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); d.userData.segs.forEach((s, i) => { s.position.z = -i * .9; });
+    vfx.emit('glow', { x: p.x, y: p.y, z: p.z, life: .4, s0: 1.8, s1: 0, c0: 0xffffff, c1: PTY, a: .7, drag: 0 });
+    for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && !hit.has(t) && dist(f, t) < f.r + t.r + 110) { hit.add(t); hurt(f, t, 2000, { dir: a }); shake(.8, .3); vfx.burst('spark', P3(t, 1), 20, { speed: 6, speed2: 14, life: .5, size: .6, c0: 0xffffff, c1: PTY }); }
+  }, () => rmExtra(d));
+}
+function startDragonField(f) {   // V: 용언의 보호막 — 거대한 용의 장판 (20초)
+  if (f.pfield) return false; setAnim(f, 'cast', .8); const R = 520, p = P3(f);
+  const ring = vfx.decal(p, { tex: 'ring', r: R * S, color: PTY, alpha: .9, y: .08 }), rune = vfx.decal(p, { tex: 'rune', r: R * S * .95, color: 0xffd0e8, alpha: .4, spin: .6, y: .07 });
+  const dr = []; for (let i = 0; i < 2; i++) { const d = dkaDragon(i === 0); d.scale.setScalar(3); addExtra(d); dr.push(d); }
+  const fld = { owner: f, x: f.x, y: f.y, R, t: 0, dur: 20, ring, rune, dr, trail: [[], []] }; B.pfields = B.pfields || []; B.pfields.push(fld); f.pfield = fld;
+  ui.flash('#ff5aa8', .5, .5); shake(1, .6); ui.pop(P3(f, 4.4), '🐉 용언의 보호막!', '#ffc0e0', true); vfx.ring(p, { r0: 1, r1: R * S, dur: .9, color: PTY });
+}
+function updPitaya(dt) {
+  for (const f of B.fighters) {
+    if (f.dscale > 0) f.dscale -= dt;
+    if (f.pbr) {   // Z 브레스
+      const b = f.pbr; b.t += dt; b.tick -= dt; f.rooted = true; const L = 800, half = .38, a = f.face, p = P3(f, 1.8), fp = P3(f, 4.5).add(new THREE.Vector3(Math.cos(a) * 3, 0, Math.sin(a) * 3));
+      b.face.position.copy(fp); b.face.scale.setScalar(Math.max(.01, 2.2 * ease.out(Math.min(1, b.t / .6)))); b.face.lookAt(fp.clone().add(new THREE.Vector3(Math.cos(a), 0, Math.sin(a))));
+      b.cone.position.copy(p).add(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(L * S * .5)); b.cone.scale.set(Math.tan(half) * L * S, L * S, Math.tan(half) * L * S); b.cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-Math.cos(a), 0, -Math.sin(a)));
+      for (let i = 0; i < 4; i++) { const d = rnd(1, L) * S, o = rnd(-half, half) * d; vfx.emit('glow', { x: p.x + Math.cos(a) * d - Math.sin(a) * o, y: 1.6 + rnd(-.8, .8), z: p.z + Math.sin(a) * d + Math.cos(a) * o, life: .4, s0: 1.4, s1: 0, c0: 0xffffff, c1: PTY, a: .6, drag: 0 }); }
+      if (b.tick <= 0) { b.tick = .1; shake(.2, .12); for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f)) { const d = dist(f, t); if (d < L + t.r && adiff(ang(f, t), a) < half + Math.atan2(t.r, Math.max(d, 1))) { hurt(f, t, 50, { quiet: true, field: true, dir: a }); t.hAcc = (t.hAcc || 0) + 50 * dmgMul(f); if (t.hAcc >= 1000) { ui.pop(P3(t, 3 + rnd(0, 1)), Math.round(t.hAcc), '#ffc0e0', true); t.hAcc = 0; } } } }
+      if (b.t >= b.dur || f.hp <= 0 || f.st.stun > 0) endPitBreath(f);
+    }
+    f.inPF = false;
+  }
+  if (B.pfields && B.pfields.length) {   // V 용의 장판
+    for (const p of B.pfields) {
+      const o = p.owner; p.t += dt; const c = P3({ x: p.x, y: p.y, realm: o.realm }); p.rune.obj.rotation.z += dt * .4;
+      p.dr.forEach((d, i) => { const a = p.t * (i ? -.9 : .9) + i * Math.PI, R = p.R * S * .85, pos = new THREE.Vector3(c.x + Math.cos(a) * R, 3.5 + Math.sin(p.t * 2 + i) * 1, c.z + Math.sin(a) * R), tr = p.trail[i]; tr.push(pos); if (tr.length > 60) tr.shift(); const sg = d.userData.segs, hd = d.userData.head; d.position.set(0, 0, 0); sg.forEach((s, j) => { const q = tr[Math.max(0, tr.length - 1 - j * 5)]; s.position.copy(q); s.scale.setScalar(3); }); const p0 = tr[tr.length - 1], p1 = tr[Math.max(0, tr.length - 4)], dv = p0.clone().sub(p1); if (dv.lengthSq() < 1e-8) dv.set(1, 0, 0); dv.normalize(); hd.scale.setScalar(3); hd.position.copy(p0).addScaledVector(dv, 3); hd.lookAt(hd.position.clone().add(dv)); hd.rotateX(Math.PI / 2); });
+      for (const t of B.fighters) if (t.hp > 0 && (t === o || ally(o, t)) && Math.hypot(t.x - p.x, t.y - p.y) < p.R) { if (t === o) o.inPF = true; }
+      if (p.t >= p.dur || o.hp <= 0) { vfx.remove(p.ring); vfx.remove(p.rune); p.dr.forEach(d => rmExtra(d)); p.done = true; o.pfield = null; o.cd.v = o.cd.v || 0; }
+    }
+    B.pfields = B.pfields.filter(p => !p.done);
+  }
+}
+CHARS.pitaya = {
+  id: 'pitaya', name: '용과드래곤 쿠키', color: PTY, fx: 0xffc0e0, cost: 2200, hp: 34000, pref: 4, atkRange: 460, aiPref: 300, tag: '검기 · 용의 브레스 · 용의 비늘 · 용언의 보호막',
+  skills: {
+    base: {
+      a: { name: '용검 검기', cd: .9, desc: '검에서 검기를 날린다 500. 4번째 공격은 브레스와 함께 검기를 날린다', use(f) {
+        setAnim(f, 'slash', .3); f.pitN = (f.pitN || 0) + 1; const a = f.face, fourth = f.pitN % 4 === 0;
+        vfx.slashGround(P3(f, .9), Math.PI / 2 - a, { len: 12, color: fourth ? PTY : 0xffffff, from: f.swingDir = -(f.swingDir || 1), dur: .3 });
+        shoot(f, { a, sp: 1100, r: fourth ? 60 : 36, dmg: 500, color: fourth ? PTY : 0xffe0f0, kind: 'wave', life: fourth ? 1.2 : .9, pierce: fourth });
+        if (fourth) { ui.pop(P3(f, 4), '🐉 브레스 검기!', '#ffc0e0', true); vfx.burst('glow', P3(f, 1.5).add(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(2)), 40, { speed: 8, speed2: 22, life: .7, size: 1.1, c0: 0xffffff, c1: PTY }); shake(.6, .3);
+          for (const o of B.fighters) if (o !== f && !ally(f, o) && o.hp > 0 && realmOf(o) === realmOf(f)) { const d = dist(f, o); if (d < 620 && adiff(ang(f, o), a) < .35) hurt(f, o, 500, { dir: a }); } }
+      } },
+      z: { name: '용의 얼굴', cd: 20, desc: '반투명한 용 얼굴의 형체가 나타나 10초 동안 긴 브레스를 쏜다 (총 5000)', use(f) { return startPitBreath(f); } },
+      x: { name: '용의 비늘', cd: 45, desc: '30초 동안 받는 피해 70% 감소. 적이 나를 공격하면 같은 공격이 원래 피해의 40%로 되돌아간다', use(f) { setAnim(f, 'cast', .6); f.dscale = 30; ui.flash('#ff5aa8', .4, .4); ui.pop(P3(f, 4.4), '🐲 용의 비늘!', '#ffc0e0', true); vfx.ring(P3(f), { r0: 1, r1: 10, dur: .7, color: PTY }); vfx.burst('spark', P3(f, 1.4), 40, { speed: 4, speed2: 12, life: .8, size: .6, c0: 0xffffff, c1: PTY }); } },
+      c: { name: '드라코닉 대쉬', cd: 26, desc: '상대에게 빠르게 돌진해 맞추면 검으로 베어 날려 보내고 브레스를 쏜다 (컷신). 총 6500', use(f) { return pitaDash(f); } },
+      v: { name: '용언의 보호막', cd: 70, desc: '거대한 용의 장판(20초). 안에서 적이 나나 아군을 때리면 그 피해만큼 보호막이 생기고 내 방어력이 오른다. 장판 안에서는 Q 로 용의 형상으로 돌진(2000)할 수 있다', use(f) { return startDragonField(f); } },
+      q: { name: '용의 돌진', cd: 5, desc: '(용언의 보호막 안) 용의 형상으로 돌진 2000', use(f) { return pitDragonDash(f); } },
+    }
+  }
+};
 /* ===== 용감한 쿠키 (커먼, HP 5000, 캔디케인) ===== */
 const BRV = 0xff8a5c;
 CHARS.brave = {
@@ -3507,7 +3602,7 @@ CHARS.gold = {
     }
   }
 };
-const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv', 'burn', 'lily', 'dkk', 'brave', 'mystic', 'gold', 'berry', 'timekeeper'];
+const ORDER = ['silent', 'lich', 'shadow', 'sugar', 'dark', 'pv', 'burn', 'lily', 'dkk', 'brave', 'mystic', 'gold', 'berry', 'timekeeper', 'pitaya'];
 
 /* ===== 리치드래곤 변신 ===== */
 function transform(f) {
@@ -3711,6 +3806,7 @@ function aiInput(f) {
     if (f.def.id === 'pv' && k === 'c' && !(f.st.lock > 0 || f.st.ctl > 0 || f.st.silence > 0 || B.mind || foe(f).veil || (foe(f).cast && foe(f).cast.type))) continue;
     if (k === 'v' && f.form !== 'base' && f.form !== 'hour' && f.form !== 'beast') continue;
     if (f.def.id === 'mystic' && ((k === 'z' && d > 650) || (k === 'x' && d > 750) || (k === 'v' && (d > 550 || f.vdom)) || (k === 'c' && (f.cocoon || d > 900)))) continue;
+    if (f.def.id === 'pitaya' && ((k === 'z' && (f.pbr || d > 700)) || (k === 'x' && (f.dscale > 0 || d > 600)) || (k === 'c' && (d > 950 || d < 250)) || (k === 'v' && (f.pfield || d > 700)))) continue;
     if (f.def.id === 'timekeeper' && ((k === 'z' && (f.rift ? f.rift.t < 6 : d > 800)) || (k === 'x' && d > 850) || (k === 'c' && (d > 900 || B.voidR)) || (k === 'v' && d > 1100))) continue;
     if (f.def.id === 'berry' && ((k === 'z' && d > 300) || (k === 'x' && (f.holy > 0 || d > 700 || f.hp / f.max > .85)) || (k === 'c' && (d > 900 || d < 220)) || (k === 'v' && (f.hbV > 0 || d > 800)))) continue;
     if (f.def.id === 'lilyA') {
@@ -3733,6 +3829,7 @@ function aiInput(f) {
   }
   if (f.def.id === 'shadow') { if (f.veil && !f.cast && f.cd.q <= 0 && Math.random() < dt * .6) inp.keys.push('q'); if (f.awake && f.gauge >= 100 && !f.ult.armed && Math.random() < dt * 2) inp.keys.push('r'); }
   if ((f.def.id === 'silent' || ((f.def.id === 'lich' || f.def.id === 'lichA' || f.def.id === 'lilyA') && f.form === 'base' && !f.minion)) && f.awake && f.gauge >= 100 && Math.random() < dt * 2) inp.keys.push('r');
+  if (f.def.id === 'pitaya' && f.inPF && d < 700 && !(f.cd.q > 0) && Math.random() < dt * .8) inp.keys.push('q');
   if (f.def.id === 'lichA') { if (f.form === 'base' && !(f.cd.e > 0) && !f.illu && d < 800 && Math.random() < dt * .12) inp.keys.push('e'); if (f.ctl2 && Math.random() < dt * .35) inp.keys.push('q'); }
   if (hz && hz.dz > hz.Z.r * .75 && !f.cast) { const za = Math.atan2(hz.Z.y - f.y, hz.Z.x - f.x); inp.mx = Math.cos(za) * .9 + inp.mx * .1; inp.my = Math.sin(za) * .9 + inp.my * .1; }   // 핫존: 구역 밖이면 구역으로
   if (f.cast && f.cast.type === 'field' && f.cast.t > 6) inp.keys.push('v');
@@ -3861,7 +3958,7 @@ function update(dt) {
   updBush();
   for (const m of B.fighters) if ((m.legion || m.illu || m.dreamOf || m.dkking || m.dmob) && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
   if (B.fighters.some(m => m.gone)) { B.fighters.filter(m => m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob)).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob))); }
-  updFxm(dt); updFire(dt); updLdoms(dt); updMystic(dt); updGold(dt); updLichRain(dt); updDka(dt); updLichA(dt); updLilyA(dt); updArchangel(dt); updBerry(dt); updTimekeeper(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
+  updFxm(dt); updFire(dt); updLdoms(dt); updMystic(dt); updGold(dt); updLichRain(dt); updDka(dt); updLichA(dt); updLilyA(dt); updArchangel(dt); updBerry(dt); updTimekeeper(dt); updPitaya(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   if (B.explore) { updExplore(dt); return; }
@@ -3873,8 +3970,8 @@ function finish() {
   if (!B) return;
   if (B.fx) { const cb = B.fx.done, win = B.over === B.fighters[0]; cleanup(); ui.hideHud(); toLobby(); cb && cb({ win }); return; }
   if ((B.mode === 'gem' || B.mode === 'bounty' || B.mode === 'hot') && B.gem) {   // 젬그랩/바운티 결과
-    const win = B.gem.win === GEM_TEAM[0], gain = win ? 400 : 150; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.base || B.fighters[0].def.id, win); if (win) SAVE.mat += 1; persist();
-    const kk = B.gem.kind, nm = kk === 'bounty' ? '바운티' : kk === 'hot' ? '핫존' : '젬그랩', ic = kk === 'bounty' ? '⭐' : kk === 'hot' ? '🔥' : '💎'; ui.result(win ? nm + ' 승리!' : nm + ' 패배...', `${ic} ${Math.floor(B.gem.cnt[0])} : ${Math.floor(B.gem.cnt[1])}  ·  +${gain} 코인` + (win ? '  ·  각성 재료 +1' : '')); return;
+    const win = B.gem.win === GEM_TEAM[0], gain = win ? 400 : 150; SAVE.coins += gain; const tn = troRec(win); if (win) SAVE.mat += 1; persist();
+    const kk = B.gem.kind, nm = kk === 'bounty' ? '바운티' : kk === 'hot' ? '핫존' : '젬그랩', ic = kk === 'bounty' ? '⭐' : kk === 'hot' ? '🔥' : '💎'; ui.result(win ? nm + ' 승리!' : nm + ' 패배...', `${ic} ${Math.floor(B.gem.cnt[0])} : ${Math.floor(B.gem.cnt[1])}  ·  +${gain} 코인` + (win ? '  ·  각성 재료 +1' : '') + tn); return;
   }
   if (B.mode === 'duel') {   // 1v1 결투: 먼저 3승
     const s = B.series, p1win = B.over === B.fighters[0]; s.w[p1win ? 0 : 1]++;
@@ -3883,13 +3980,13 @@ function finish() {
       const bb = B, a = bb.fighters[0].def.id, b = bb.fighters[1].def.id, mid = bb.map.id;
       setTimeout(() => { if (B === bb) startBattle(a, b, 'duel', mid, s); }, 2200); return;
     }
-    const win = s.w[0] >= 3, gain = win ? 500 : 150; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.base || B.fighters[0].def.id, win);
+    const win = s.w[0] >= 3, gain = win ? 500 : 150; SAVE.coins += gain; const tn = troRec(win);
     if (win) { const id = B.fighters[1].def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; SAVE.mat += 2; } persist();
-    ui.result(win ? '결투 승리!' : '결투 패배...', `${s.w[0]} : ${s.w[1]}  ·  +${gain} 코인` + (win ? '  ·  각성 재료 +2' : '')); return;
+    ui.result(win ? '결투 승리!' : '결투 패배...', `${s.w[0]} : ${s.w[1]}  ·  +${gain} 코인` + (win ? '  ·  각성 재료 +2' : '') + tn); return;
   }
   if (B.mode === 'raid') { const r = ui.recordRaid(B.raid.dmg); ui.result(B.over === B.fighters[0] ? '보스 처치!' : '레이드 종료', `이번 피해 ${Math.round(B.raid.dmg).toLocaleString()}${r.isBest ? ' (최고 기록!)' : ''} · 최고 ${r.best.toLocaleString()}`); return; }
   const w = B.over, p1win = w === B.fighters[0]; let sub = '';
-  if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; ui.recordMatch(SAVE, B.fighters[0].def.base || B.fighters[0].def.id, p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; SAVE.mat += 1; } persist(); sub = '+' + gain + ' 코인' + (p1win ? '  ·  각성 재료 +1' : ''); }
+  if (B.mode === 'ai') { const gain = p1win ? 300 : 100; SAVE.coins += gain; const tn = troRec(p1win); if (p1win) { const id = w.def.id; SAVE.wins[id] = (SAVE.wins[id] || 0) + 1; SAVE.mat += 1; } persist(); sub = '+' + gain + ' 코인' + (p1win ? '  ·  각성 재료 +1' : '') + tn; }
   ui.result(B.mode === 'ai' ? (p1win ? '승리!' : '패배...') : (p1win ? '1P 승리!' : '2P 승리!'), sub);
 }
 

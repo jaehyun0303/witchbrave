@@ -16,6 +16,7 @@ const VC = {
   lilyA: { url: 'assets/models/lilyA/lilyA.glb', h: 2.9 },
   berry: { url: 'assets/models/berry/berry.glb', h: 2.8 },
   timekeeper: { url: 'assets/models/timekeeper/timekeeper.glb', h: 2.7, skinned: true },
+  pitaya: { url: 'assets/models/pitaya/pitaya.glb', h: 2.8, skinned: true },
   gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
