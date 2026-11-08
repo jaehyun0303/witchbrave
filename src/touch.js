@@ -5,7 +5,7 @@ export const isTouch = (() => { try { return /[?&]touch=1/.test(location.search)
 export const TOUCH = { mx: 0, my: 0, atk: false, aim: null, until: 0 };
 
 let root, joy, knob, base, btns = [], api, fighter = null, camBtn;
-const KEYS = ['z', 'x', 'c', 'v', 'q', 'r'];
+const KEYS = ['z', 'x', 'c', 'v', 'e', 'q', 'r'];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 function css() {

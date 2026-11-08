@@ -32,7 +32,7 @@ export function heartMesh(mat, size = 1) {
 
 /* ================= 쿠키 (일반 형태) ================= */
 export function buildCookie(def) {
-  const id = def.id, col = new THREE.Color(def.color);
+  const id = def.id === 'lichA' ? 'lich' : def.id, col = new THREE.Color(def.color);
   const P = {
     pv: { skin: 0xfff0dc, hair: 0xfff8e0, eye: 0xffc933, cloth: 0xf7e7c4, trim: 0xffd873 },
     silent: { skin: 0xf1ebe0, hair: 0xf6f8ff, eye: 0x9fc0ff, cloth: 0x34447f, trim: 0xcfd8ff },

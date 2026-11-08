@@ -50,7 +50,7 @@ export function beginBattle(B) {
     const p = document.createElement('div'); p.className = 'hpanel ' + (i ? 'right' : 'left');
     p.innerHTML = `<div class="pname" style="color:${hex(f.def.color)}">${f.def.name}<span class="form"></span></div>
       <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div><div class="shfill"></div><span class="hptxt"></span></div>
-      ${mine ? `<div class="skills">${['z', 'x', 'c', 'v', 'q', 'r'].filter(k => f.def.skills.base[k]).map((k, j) => `<div class="slot" data-k="${k}"><i>${f.ctrl.kind === 'h2' ? { z: '7', x: '8', c: '9', v: '0', q: '6', r: '-' }[k] : k.toUpperCase()}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
+      ${mine ? `<div class="skills">${['z', 'x', 'c', 'v', 'e', 'q', 'r'].filter(k => f.def.skills.base[k]).map((k, j) => `<div class="slot" data-k="${k}"><i>${f.ctrl.kind === 'h2' ? { z: '7', x: '8', c: '9', v: '0', q: '6', r: '-' }[k] : k.toUpperCase()}</i><span>${f.def.skills.base[k].name}</span><div class="cdm"></div><b class="cdt"></b></div>`).join('')}</div>` : ''}`;
     root.appendChild(p);
     const tag = document.createElement('div'); tag.className = 'tag3d'; tag.innerHTML = '<div class="nm"></div><div class="mini"><div></div></div><div class="ic"></div>'; root.appendChild(tag);
     hud.panels.push({ f, el: p, fill: p.querySelector('.hpfill'), ghost: p.querySelector('.hpghost'), txt: p.querySelector('.hptxt'), sh: p.querySelector('.shfill'), form: p.querySelector('.form'), slots: [...p.querySelectorAll('.slot')], ghostV: 1 });
@@ -125,6 +125,27 @@ export function dim(n) {   // 암흑의 기운: 중첩(0~3)마다 시야가 좁�
   if (e._n === n) return; e._n = n;
   const r = [[0, 0], [40, 62], [27, 44], [15, 30]][n] || [0, 0];
   e.style.background = n ? `radial-gradient(circle at 50% 55%, rgba(0,0,0,0) ${r[0]}vmin, rgba(2,0,8,.96) ${r[1]}vmin)` : 'none';
+}
+export function tint(color) {   // 전체 화면 색조 (종말의 하늘 등). '' 이면 제거
+  let e = document.getElementById('tintv');
+  if (!color) { if (e) e.remove(); return; }
+  if (!e) { e = document.createElement('div'); e.id = 'tintv'; e.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:29;mix-blend-mode:screen'; $('#game').appendChild(e); }
+  e.style.background = color;
+}
+const FEAR = ['죽어', '도망쳐', '끝이야', '뒤를 봐', '눈을 떠', '소용없어', '함께 가자', '무서워?', '어둠', '아직이야', '살려줘', '이제 늦었어'];
+export function fear(on) {   // 보라 브레스에 맞으면 무서운 글자가 화면을 덮는다
+  let e = document.getElementById('fearv');
+  if (!on) { if (e) e.remove(); return; }
+  if (!e) { e = document.createElement('div'); e.id = 'fearv'; e.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:31;overflow:hidden;background:radial-gradient(circle,rgba(20,0,40,.3),rgba(10,0,20,.82))'; $('#game').appendChild(e); e._t = 0; }
+  const now = performance.now(); if (now - e._t > 200) {
+    e._t = now; const s = document.createElement('span'); s.textContent = FEAR[Math.floor(Math.random() * FEAR.length)];
+    s.style.cssText = `position:absolute;left:${Math.random() * 80}%;top:${Math.random() * 85}%;font:900 ${28 + Math.random() * 60}px sans-serif;color:rgba(255,40,80,.88);text-shadow:0 0 14px #700;transform:rotate(${Math.random() * 40 - 20}deg)`; e.appendChild(s); if (e.children.length > 16) e.firstChild.remove();
+  }
+}
+export function pink(on) {   // 거대 하트: 시야가 핑크빛
+  let e = document.getElementById('pinkv');
+  if (!on) { if (e) e.remove(); return; }
+  if (!e) { e = document.createElement('div'); e.id = 'pinkv'; e.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:30;background:rgba(255,110,200,.42);mix-blend-mode:screen'; $('#game').appendChild(e); }
 }
 export function vignette(on) { $('#game').classList.toggle('vig', on); }
 export function result(text, sub) { try { dispatchEvent(new Event('wb-result')); } catch (_) {}$('#rtext').textContent = text; $('#rsub').textContent = sub || ''; $('#result').style.display = 'flex'; }
