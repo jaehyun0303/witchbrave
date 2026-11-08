@@ -16,7 +16,7 @@ import SHOP from './ui-screens/shop.html';
 // 모드를 늘리려면 MODES 에 항목을 추가한다. ready:false 는 "준비 중" 표시.
 export const MODES = [
   { id: 'ai', title: 'AI 대전', desc: '1 vs 1 · 상대는 AI', long: 'AI 상대와 1 대 1로 싸웁니다. 승리하면 코인과 트로피를 얻어요.', chips: ['1 vs 1', 'AI 상대'], ready: true },
-  { id: 'online', title: '온라인 대전', desc: '서버 매칭 1 vs 1', long: '서버에서 상대를 찾아 1 대 1로 싸웁니다. 곧 열립니다.', chips: ['1 vs 1', '서버 매칭'], ready: false },
+  { id: 'hot', title: '3v3 영역 점령', desc: '3 vs 3 핫존', long: '맵의 점령 구역 2곳을 우리 팀이 차지하고 있으면 초당 점수가 쌓여요. 두 팀이 같이 서 있으면 경합이라 점수가 안 올라요. 먼저 100점을 모으거나 2분 30초 뒤 점수가 높은 팀이 승리! 쓰러져도 3.5초 뒤 부활해요. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '구역 차지 · 100점'], ready: true },
   { id: 'gem', title: '3v3 젬그랩', desc: '3 vs 3 젬 모으기', long: '중앙 광산에서 솟는 젬을 모아 팀이 10개를 15초 동안 지키면 승리해요. 쓰러지면 젬을 떨어뜨리고 3.5초 뒤 부활합니다. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '젬 10개 · 15초'], ready: true },
   { id: 'raid', title: '보스 레이드', desc: '4인 협동 보스 처치', long: '곧 열립니다.', chips: ['4인 협동', '보스 처치'], ready: false },
   { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: 'AI 상대와 먼저 3승을 먼저 거두는 쪽이 이겨요. 이기면 코인 500, 져도 150.', chips: ['1 vs 1', '먼저 3승'], ready: true },
@@ -30,6 +30,8 @@ const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   pv: { rar: '에인션트', group: '서포터', role: '마법 힐러', atk: 40, spd: 50, rng: 65 },
   dark: { rar: '레전더리', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
   burn: { rar: '비스트', group: '딜러', role: '근접 도끼 전사', atk: 72, spd: 50, rng: 22 },
+  berry: { rar: '에인션트', group: '탱커', role: '방패 수호자', atk: 40, spd: 40, rng: 25 },
+  lilyA: { rar: '에인션트', group: '서포터', role: '자유의 백합', atk: 60, spd: 50, rng: 70 },
   gold: { rar: '에인션트', group: '딜러', role: '금빛 창술사', atk: 75, spd: 55, rng: 60 },
   mystic: { rar: '비스트', group: '서포터', role: '신비 마법사', atk: 55, spd: 55, rng: 50 },
   brave: { rar: '커먼', group: '딜러', role: '근접 돌격수', atk: 25, spd: 55, rng: 22 },
@@ -190,7 +192,7 @@ function wireClose(art) { const c = byLabel(art, '닫기') || byLabel(art, '뒤�
 
 /* ---------- 로비 ---------- */
 const build = {};
-let nickAsked = false;
+let nickAsked = false, charScroll = 0;
 build.lobby = art => {
   const SAVE = S(), id = api.picked(), c = api.CHARS[id], mt = meta(id), em = claimable(DAILY).length + claimable(WEEKLY).length;
   byLabel(art, '3D 캐릭터 모델 자리').remove();
@@ -250,6 +252,7 @@ build.mode = art => {
 build.chars = art => {
   const SAVE = S(), left = [...art.children].find(e => e.style.width === '700px'), right = [...art.children].find(e => e.style.left === '744px');
   currencies(art, true, true); wireClose(art);
+  left.style.overflowY = 'auto'; left.style.overflowX = 'hidden'; left.style.scrollbarWidth = 'thin'; left.addEventListener('scroll', () => { charScroll = left.scrollTop; }); setTimeout(() => { left.scrollTop = charScroll; }, 0);   // 캐릭터가 많아서 목록 스크롤
   const oldCards = [...left.querySelectorAll(':scope>button')], tSel = oldCards[0].cloneNode(true), tNorm = oldCards[1].cloneNode(true), tLock = oldCards[6].cloneNode(true);
   oldCards.forEach(c => c.remove());
   const stripe = (card, r) => { const [a, b] = RC[r]; card.firstElementChild.style.background = `repeating-linear-gradient(45deg,${a} 0,${a} 14px,${b} 14px,${b} 28px)`; };

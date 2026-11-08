@@ -12,6 +12,8 @@ const VC = {
   burnA: { url: 'assets/models/burnA/burnA.glb', h: 2.9 },
   dkk: { url: 'assets/models/dkk/dkk.glb', h: 2.8 },
   dkkA: { url: 'assets/models/dkkA/dkkA.glb', h: 3.0 },
+  lilyA: { url: 'assets/models/lilyA/lilyA.glb', h: 2.9 },
+  berry: { url: 'assets/models/berry/berry.glb', h: 2.8 },
   gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
@@ -22,7 +24,7 @@ export function preloadVC(id) {
   const d = VC[id], w = typeof window !== 'undefined' ? window : {};
   return new Promise(res => loadGLB(w['__' + id.toUpperCase() + '_URL'] || d.url, gl => {
     try {
-      const obj = gl.scene; obj.traverse(o => { if (o.isMesh) { o.material.side = THREE.FrontSide; o.material.roughness = .7; o.material.metalness = 0; } });
+      const obj = gl.scene; obj.traverse(o => { if (o.isMesh) { o.material.side = THREE.FrontSide; o.material.roughness = .7; o.material.metalness = 0; const nr = o.geometry.attributes.normal; if (nr) for (let i = 0; i < nr.count; i++) { if (nr.getX(i) * nr.getX(i) + nr.getY(i) * nr.getY(i) + nr.getZ(i) * nr.getZ(i) < 1e-8) nr.setXYZ(i, 0, 1, 0); } } });   // 길이 0 인 법선은 셰이더에서 NaN 이 되어 블룸으로 화면 전체가 까맣게 된다
       obj.updateMatrixWorld(true);
       const bx = new THREE.Box3().setFromObject(obj), s = bx.getSize(new THREE.Vector3());
       cache[id] = { scene: obj, off: new THREE.Vector3(-(bx.min.x + bx.max.x) / 2, -bx.min.y, -(bx.min.z + bx.max.z) / 2), scale: d.h / (d.fit === 'max' ? Math.max(s.x, s.y, s.z) : s.y), size: s };
