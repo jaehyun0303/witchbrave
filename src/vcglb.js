@@ -20,7 +20,10 @@ const VC = {
   pitayaD: { url: 'assets/models/pitayaD/pitayaD.glb', h: 8 },   // 변신(용과드래곤) 모델
   ananas: { url: 'assets/models/ananas/ananas.glb', h: 2.8, skinned: true },
   gold: { url: 'assets/models/gold/gold.glb', h: 2.7 },
+  goldA: { url: 'assets/models/goldA/goldA.glb', h: 2.9 },
   mystic: { url: 'assets/models/mystic/mystic.glb', h: 2.8 },
+  mysticA: { url: 'assets/models/mysticA/mysticA.glb', h: 2.9 },
+  mysticB: { url: 'assets/models/mysticB/mysticB.glb', h: 4.2 },   // 공허의 고치 (괴수화)
   burnB: { url: 'assets/models/burnB/burnB.glb', h: 10, fit: 'max' },   // 괴수화 불지네: 가장 긴 변 기준
 };
 const cache = {};

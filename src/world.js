@@ -111,6 +111,8 @@ export function createWorld(canvas) {
     { sky: [0x3a2006, 0xe0983a, 0x241204], fog: 0x5a360e, floor: 0xc88a38, em: 0x4a2a08, glow: 0xffc860, stars: false },  // 3 와플 공장
     { sky: [0xf0a8d4, 0xffe4f2, 0xe090c0], fog: 0xf0b0d8, floor: 0xffc9e8, em: 0x602a50, glow: 0xff8ad0, stars: false },  // 4 설탕 낙원
     { sky: [0x0c0002, 0x520610, 0x070001], fog: 0x1a0206, floor: 0x240608, em: 0x300408, glow: 0xff2a3a, stars: true },    // 5 붉은 달
+    { sky: [0x140508, 0x4a1a0a, 0x070204], fog: 0x2a1408, floor: 0xb8822c, em: 0x4a2a06, glow: 0xffd040, stars: true },    // 6 가상의 골드치즈 왕국
+    { sky: [0x0a0604, 0x2a1808, 0x050302], fog: 0x1a0e04, floor: 0x7a5a28, em: 0x2a1a06, glow: 0xffb020, stars: false },    // 7 피라미드 내부
   ].map((c, i) => {
     const g = new THREE.Group(); g.visible = false; dreamR.add(g);
     const dome = skyDome(c.sky[0], c.sky[1], c.sky[2], c.stars); dome.visible = false; g.add(dome);
@@ -128,6 +130,15 @@ export function createWorld(canvas) {
       for (let k = 0; k < 5; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.6, 40, 10), new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: .9 })); const a = k / 5 * 6.283; c.position.set(Math.cos(a) * 95, 20, Math.sin(a) * 60 - 20); g.add(c); }
     } else if (i === 3) {   // 설탕 낙원: 사탕 기둥
       for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283, c = new THREE.Mesh(new THREE.ConeGeometry(2.6, 18 + (k % 4) * 6, 6), new THREE.MeshStandardMaterial({ color: k % 2 ? 0xffffff : 0xff8ac8, emissive: 0xff5aa8, emissiveIntensity: .25, flatShading: true })); c.position.set(Math.cos(a) * 80, 9 + (k % 4) * 3, Math.sin(a) * 52 - 8); g.add(c); }
+    } else if (i === 5) {   // 골드치즈 왕국: 사막 밤, 황금 기둥과 서치라이트, 오른쪽 끝에 거대한 피라미드
+      const sm = new THREE.MeshStandardMaterial({ color: 0xc89a3a, emissive: 0x4a3008, roughness: .8, flatShading: true }), gm = new THREE.MeshBasicMaterial({ color: 0x3affa0 }), rm = new THREE.MeshStandardMaterial({ color: 0xa02020, emissive: 0x401008, flatShading: true });
+      for (let k = 0; k < 6; k++) { const wd = 28 - k * 4.4, b = new THREE.Mesh(new THREE.BoxGeometry(wd, 3.4, wd), sm); b.position.set(54, 1.7 + k * 3.4, 0); g.add(b); const t = new THREE.Mesh(new THREE.BoxGeometry(wd + .2, .3, wd + .2), gm); t.position.set(54, 3.4 + k * 3.4, 0); g.add(t); }
+      const dr = new THREE.Mesh(new THREE.BoxGeometry(.6, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffe27a })); dr.position.set(39.8, 3, 0); g.add(dr);
+      for (let k = 0; k < 10; k++) { const x = -62 + k * 12, z = (k % 2 ? 1 : -1) * 31, c = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.3, 15, 10), sm); c.position.set(x, 7.5, z); g.add(c); const cp = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2, 2.4, 10), rm); cp.position.set(x, 16, z); g.add(cp); for (let j = 0; j < 3; j++) { const bd = new THREE.Mesh(new THREE.TorusGeometry(2.1, .18, 6, 16), gm); bd.rotation.x = Math.PI / 2; bd.position.set(x, 4 + j * 4, z); g.add(bd); } }
+      for (let k = 0; k < 3; k++) { const cn = new THREE.Mesh(new THREE.ConeGeometry(7, 80, 16, 1, true), addMat(0xffe040, .13)); cn.position.set(-30 + k * 30, 40, -34); cn.rotation.z = (k - 1) * .3; cn.rotation.x = .2; g.add(cn); }
+      for (let k = 0; k < 2; k++) { const bb = new THREE.Mesh(new THREE.PlaneGeometry(30, 18), addMat(k ? 0x3affa0 : 0xffc040, .35)); bb.material.map = tex('rune'); bb.position.set(-40 + k * 70, 24, -42); g.add(bb); }
+    } else if (i === 6) {   // 피라미드 내부: 어두운 사암 + 초록·금빛 횃불
+      for (let k = 0; k < 26; k++) { const rnd = (p, q) => p + Math.random() * (q - p), a = rnd(0, 6.283), r = rnd(20, 78), gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: k % 2 ? 0x3affa0 : 0xffc040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .8 })); gl.scale.setScalar(rnd(6, 12)); gl.position.set(Math.cos(a) * r * 1.1, rnd(1, 3), Math.sin(a) * r * .55); g.add(gl); }
     } else {   // 붉은 달
       const moon = new THREE.Mesh(new THREE.SphereGeometry(46, 32, 24), new THREE.MeshBasicMaterial({ color: 0xff2030 })); moon.position.set(0, 80, -170); g.add(moon);
       const mg = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: 0xff3040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); mg.scale.setScalar(220); mg.position.copy(moon.position); g.add(mg);
