@@ -72,7 +72,7 @@ export function update(B, camera, renderer, dt) {
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
     p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
-    p.form.textContent = f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'sky' ? ' [하늘]' : f.form === 'pdragon' ? ' [용과드래곤]' : f.form === 'reign' ? ' [군림]' : f.form === 'angel' ? ' [운명의 대천사]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : (f.def.id === 'mysticA' ? ' [공허의 고치]' : ' [괴수화]')) : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
+    p.form.textContent = f.form === 'king' ? ' [대왕거미]' : f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'sky' ? ' [하늘]' : f.form === 'pdragon' ? ' [용과드래곤]' : f.form === 'reign' ? ' [군림]' : f.form === 'angel' ? ' [운명의 대천사]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : (f.def.id === 'mysticA' ? ' [공허의 고치]' : ' [괴수화]')) : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
     p.slots.forEach(s => {
       const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
