@@ -37,3 +37,6 @@
 - **floor**: `seamless tileable dark fantasy stone tile floor with faint glowing violet grid lines, top-down texture`
 
 Silent Salt 컷신의 "달" 은 `moon`, 침묵의 검기는 `slash`, 침묵의 영역은 `rune`+`ring` 을 주로 씁니다.
+
+## 적용된 커스텀 텍스처
+- `smoke.png`(밀가루/연기 구름, 256), `flame.png`(불꽃, 256): 원본이 체크무늬 배경이 그려진 이미지(투명 아님)여서 밝기 기준으로 알파를 뽑아 흰색+알파 PNG 로 변환해 넣음. 다음 텍스처도 **진짜 투명 PNG** 로 받는 게 가장 좋다(변환하면 옅은 가장자리가 조금 깎임). `flame` 은 `vfx.emit('flame', …)` 이미터(가산)로 쓴다.

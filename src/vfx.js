@@ -85,6 +85,7 @@ export class VFX {
       spark: new Emitter(scene, 'spark', 2500, THREE.AdditiveBlending),
       heart: new Emitter(scene, 'heart', 600, THREE.AdditiveBlending),
       smoke: new Emitter(scene, 'smoke', 800, THREE.NormalBlending),
+      flame: new Emitter(scene, 'flame', 1200, THREE.AdditiveBlending),
       dglow: new Emitter(scene, 'glow', 1500, THREE.NormalBlending),
       dspark: new Emitter(scene, 'spark', 800, THREE.NormalBlending),
     };
@@ -148,6 +149,10 @@ export class VFX {
     const m = new THREE.Mesh(planeGeo, addMat(tex(o.tex || 'ring'), o.color ?? 0xffffff, o.alpha ?? 1));
     m.rotation.x = -Math.PI / 2; m.position.set(p.x, (o.y ?? .06) + (p.y || 0), p.z); m.renderOrder = 5;
     const r0 = o.r0 ?? .5, r1 = o.r1 ?? 6;
+    if (!o.noRim && (o.alpha ?? 1) > .3 && r1 >= 2) {   // 2겹: 앞서 나가는 흰 테두리 + 본체
+      const rim = new THREE.Mesh(planeGeo, addMat(tex('ring'), 0xffffff, .9)); rim.rotation.x = -Math.PI / 2; rim.position.set(p.x, (o.y ?? .06) + (p.y || 0) + .01, p.z); rim.renderOrder = 6;
+      this.add(rim, (o.dur ?? .6) * .75, (u, ob) => { const r = (r0 + (r1 - r0) * ease.out(Math.min(1, u * 1.15))) * 2.04; ob.scale.set(r, r, 1); ob.material.opacity = .85 * (1 - u) * (1 - u); });
+    }
     return this.add(m, o.dur ?? .6, (u, ob) => {
       const r = (r0 + (r1 - r0) * ease.out(u)) * 2; ob.scale.set(r, r, 1); ob.material.opacity = (o.alpha ?? 1) * (1 - u) * (1 - u);
     });
@@ -157,6 +162,10 @@ export class VFX {
     const m = new THREE.Mesh(colGeo, addMat(tex(o.tex || 'beam'), o.color ?? 0xffffff, 1));
     m.position.set(p.x, p.y || 0, p.z); m.renderOrder = 6;
     const r = o.r ?? 2, h = o.h ?? 14;
+    if (!o.noCore && r >= 1 && !isDark(o.color ?? 0xffffff)) {   // 중심을 더 밝게
+      const cm = new THREE.Mesh(colGeo, addMat(tex('beam'), 0xffffff, .8)); cm.position.set(p.x, p.y || 0, p.z); cm.renderOrder = 7;
+      this.add(cm, (o.dur ?? .8) * .8, (u, ob) => { const g = Math.min(1, u * 6), w = r * .45 * (1 - u * .7); ob.scale.set(w * g + .001, h * 1.05 * ease.out(g), w * g + .001); ob.material.opacity = .8 * (1 - u); });
+    }
     return this.add(m, o.dur ?? .8, (u, ob) => {
       const grow = Math.min(1, u * 5), w = r * (1 + u * .3) * (1 - u * .6);
       ob.scale.set(w * grow + .001, h * ease.out(grow), w * grow + .001);
@@ -178,6 +187,11 @@ export class VFX {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(o.tex || 'glow'), color: o.color ?? 0xffffff, transparent: true, depthWrite: false, blending: blendOf(o.color ?? 0xffffff), rotation: o.rot || 0 }));
     s.position.set(p.x, p.y, p.z); s.renderOrder = 12;
     const sz = o.size ?? 3;
+    if (sz >= 2.2 && !o.noStar && !isDark(o.color ?? 0xffffff)) for (let i = 0; i < 2; i++) {   // 십자 광선 (타격 섬광)
+      const st = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('spark'), color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, rotation: i * 1.5708 + (o.rot || 0) + rnd(-.3, .3) }));
+      st.position.set(p.x, p.y, p.z); st.renderOrder = 13;
+      this.add(st, (o.dur ?? .25) * .9, (u, ob) => { const k = sz * 1.9 * (.5 + .5 * ease.out(u)); ob.scale.set(k, k * .09 * (1 - u) + .01, 1); ob.material.opacity = (1 - u) * .9; });
+    }
     return this.add(s, o.dur ?? .25, (u, ob) => { const k = sz * (o.grow ? .4 + .6 * ease.out(u) : 1 - u * .5); ob.scale.set(k * (o.sx || 1), k, 1); ob.material.opacity = (1 - u) * (o.a ?? 1); });
   }
   // 바닥 위 초승달 베기 (근접 공격)
@@ -218,5 +232,24 @@ export class VFX {
       if (it.closing && it.k <= 0) this.drop(it);
     });
     return it;
+  }
+
+  /* ----- 합성 이펙트 (여러 겹) ----- */
+  // 착탄/타격: 섬광 + 십자광 + 파편 + 불씨 + 충격파 링 (power 1 = 보통)
+  impact(p, color = 0xffffff, power = 1) {
+    const n = Math.round(14 * power);
+    this.flash(p, { size: 2.2 + 1.6 * power, color, dur: .22, grow: true });
+    this.burst('spark', p, n, { speed: 5 * power, speed2: 12 * power, life: .3, life2: .65, size: .35 + .12 * power, c0: 0xffffff, c1: color, drag: 3, grav: 6 });
+    this.burst('glow', p, Math.round(n * .5), { speed: 1.5, speed2: 4, life: .5, life2: 1, size: .7 * power + .3, c0: color, c1: color, a: .6, drag: 1.5, up: 1.5 });
+    if (power >= 1) this.ring({ x: p.x, y: 0, z: p.z }, { r0: .3, r1: 1.6 + 1.4 * power, dur: .35, color, alpha: .8, noRim: power < 1.6 });
+  }
+  // 시전 준비: 몸 주위로 빛이 빨려 들어간다 (anticipation)
+  cast(p, color = 0xffffff, r = 3) {
+    for (let i = 0; i < 18; i++) {
+      const a = rnd(0, 6.283), e = rnd(-.6, .9), d = r * rnd(.7, 1.1), ex = Math.cos(a) * Math.cos(e) * d, ey = Math.sin(e) * d, ez = Math.sin(a) * Math.cos(e) * d, life = rnd(.18, .32);
+      this.emit('glow', { x: p.x + ex, y: p.y + ey, z: p.z + ez, vx: -ex / life * .9, vy: -ey / life * .9, vz: -ez / life * .9, life, s0: .55, s1: .05, c0: color, c1: 0xffffff, a: .85, drag: 0 });
+    }
+    this.flash(p, { size: 2.4, color, dur: .28, noStar: true });
+    this.ring({ x: p.x, y: 0, z: p.z }, { r0: r * .9, r1: .6, dur: .25, color, alpha: .55, noRim: true });
   }
 }

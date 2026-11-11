@@ -74,7 +74,7 @@ export function update(B, camera, renderer, dt) {
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
     p.form.textContent = f.form === 'king' ? ' [대왕거미]' : f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'sky' ? ' [하늘]' : f.form === 'pdragon' ? ' [용과드래곤]' : f.form === 'reign' ? ' [군림]' : f.form === 'angel' ? ' [운명의 대천사]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : (f.def.id === 'mysticA' ? ' [공허의 고치]' : ' [괴수화]')) : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
     p.slots.forEach(s => {
-      const k = s.dataset.k, sk = f.def.skills[f.form][k], cd = f.cd[k];
+      const pf = f.att && f.att.statue && f.att.possBy === f ? f.att : f, k = s.dataset.k, sk = pf.def.skills[pf.form][k] || { name: '-', cd: 1 }, cd = pf.cd[k] || 0;   // 동상에 빙의 중이면 동상의 스킬을 표시
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
       s.querySelector('.cdt').textContent = cd > 0 ? cd.toFixed(1) : (f.def.id === 'lich' && f.form === 'base' && k === 'v' && !f.awake ? '🔒' : '');
       s.classList.toggle('ready', cd <= 0 && (k !== 'r' || (f.awake && f.gauge >= 100)));

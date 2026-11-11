@@ -119,7 +119,7 @@ export function showTouch(on, f) {
 export function updateTouch() {
   const f = fighter; if (!f || !btns.length) return;
   for (const b of btns) {
-    if (!b.k) continue; const k = b.k, sk = f.def.skills[f.form][k]; if (!sk) continue; const cd = f.cd[k];
+    if (!b.k) continue; const pf = f.att && f.att.statue && f.att.possBy === f ? f.att : f, k = b.k, sk = pf.def.skills[pf.form][k]; if (!sk) continue; const cd = pf.cd[k];
     const cdm = b.el.querySelector('.cdm'), cdt = b.el.querySelector('.cdt'), sm = b.el.querySelector('small');
     if (sm && sm.textContent !== sk.name) sm.textContent = sk.name;
     let h = cd > 0 ? Math.min(100, cd / sk.cd * 100) : 0, t = cd > 0 ? cd.toFixed(1) : '';
