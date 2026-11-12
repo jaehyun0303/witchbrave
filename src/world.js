@@ -113,6 +113,7 @@ export function createWorld(canvas) {
     { sky: [0x0c0002, 0x520610, 0x070001], fog: 0x1a0206, floor: 0x240608, em: 0x300408, glow: 0xff2a3a, stars: true },    // 5 붉은 달
     { sky: [0x140508, 0x4a1a0a, 0x070204], fog: 0x2a1408, floor: 0xb8822c, em: 0x4a2a06, glow: 0xffd040, stars: true },    // 6 가상의 골드치즈 왕국
     { sky: [0x0a0604, 0x2a1808, 0x050302], fog: 0x1a0e04, floor: 0x7a5a28, em: 0x2a1a06, glow: 0xffb020, stars: false },    // 7 피라미드 내부
+    { sky: [0xf2f2fa, 0xffffff, 0xdcdcec], fog: 0xe8e8f4, floor: 0xf4f4fc, em: 0xb8b8d0, glow: 0xffffff, stars: false },    // 8 공허의 머릿속 (하얀 안개)
   ].map((c, i) => {
     const g = new THREE.Group(); g.visible = false; dreamR.add(g);
     const dome = skyDome(c.sky[0], c.sky[1], c.sky[2], c.stars); dome.visible = false; g.add(dome);
@@ -203,6 +204,7 @@ export function createWorld(canvas) {
       const k = on ? (this._ds || 0) : 0; if (this._vdk === k) return; this._vdk = k;
       DREAMS.forEach((d, i) => d.dome.visible = k === i + 1); const c = k ? DREAMS[k - 1].c : null;
       if (this._va !== true) { arena.visible = !k; scene.fog.color.set(c ? c.fog : theme.fog[0]); bloom.strength = k ? .8 : theme.bloom; }
+      scene.fog.density = k === 8 ? .028 : theme.fog[1];
     },
     setSeal(on) { this.setMind(on); if (on) scene.fog.color.set(0x06161a); },
     setStorm(on) {

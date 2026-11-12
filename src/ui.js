@@ -68,11 +68,11 @@ export function update(B, camera, renderer, dt) {
   if (!hud) return;
   const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
   for (const p of hud.panels) {
-    const f = p.f, r = Math.max(0, f.hp / f.max);
+    const f0 = p.f, f = f0.att && f0.att.statue && f0.att.possBy === f0 ? f0.att : f0, r = Math.max(0, f.hp / f.max);   // 동상에 빙의 중이면 동상의 체력을 보여준다
     p.fill.style.width = r * 100 + '%'; p.ghostV = Math.max(r, p.ghostV - dt * .25); p.ghost.style.width = p.ghostV * 100 + '%';
     p.txt.textContent = Math.ceil(f.hp).toLocaleString() + ' / ' + f.max.toLocaleString() + (f.shieldMax ? '   🛡 ' + Math.ceil(f.shield).toLocaleString() : '');
     if (p.sh) p.sh.style.width = f.shieldMax ? Math.max(0, f.shield / f.shieldMax) * 100 + '%' : '0';
-    p.form.textContent = f.form === 'king' ? ' [대왕거미]' : f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'sky' ? ' [하늘]' : f.form === 'pdragon' ? ' [용과드래곤]' : f.form === 'reign' ? ' [군림]' : f.form === 'angel' ? ' [운명의 대천사]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : (f.def.id === 'mysticA' ? ' [공허의 고치]' : ' [괴수화]')) : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
+    p.form.textContent = f !== f0 ? ' [' + f.def.name.replace(' 사천왕', '') + ' 조종 중 · Q: 원래 몸으로]' : f.form === 'king' ? ' [대왕거미]' : f.form === 'dragon' ? ' [용]' : f.form === 'witch' ? ' [마녀]' : f.form === 'sky' ? ' [하늘]' : f.form === 'pdragon' ? ' [용과드래곤]' : f.form === 'reign' ? ' [군림]' : f.form === 'angel' ? ' [운명의 대천사]' : f.form === 'hour' ? ' [침묵의 때]' : f.form === 'beast' ? (f.boss > 0 ? ' [괴수화 · 보스 모드]' : (f.def.id === 'mysticA' ? ' [공허의 고치]' : ' [괴수화]')) : f.boss > 0 ? ' [보스 모드]' : f.sealSoul ? ' [영혼]' : '';
     p.slots.forEach(s => {
       const pf = f.att && f.att.statue && f.att.possBy === f ? f.att : f, k = s.dataset.k, sk = pf.def.skills[pf.form][k] || { name: '-', cd: 1 }, cd = pf.cd[k] || 0;   // 동상에 빙의 중이면 동상의 스킬을 표시
       s.querySelector('span').textContent = sk.name; s.querySelector('.cdm').style.height = cd > 0 ? Math.min(100, cd / sk.cd * 100) + '%' : '0';
@@ -82,6 +82,7 @@ export function update(B, camera, renderer, dt) {
       if (k === 'r') { s.querySelector('.cdt').textContent = !f.awake ? '🔒' : f.gauge >= 100 ? 'READY' : Math.floor(f.gauge) + '%'; s.querySelector('.cdm').style.height = f.awake ? (100 - Math.min(100, f.gauge)) + '%' : '100%'; }
     });
   }
+  { let qh = document.getElementById('qhint'); const m0 = B.fighters[0], on = m0 && m0.def.id === 'mysticA' && m0.hp > 0 && (m0.att || m0.fog); if (on && !qh) { qh = document.createElement('div'); qh.id = 'qhint'; qh.style.cssText = 'position:absolute;left:50%;bottom:150px;transform:translateX(-50%);z-index:40;padding:8px 18px;border-radius:10px;background:rgba(20,10,40,.85);border:2px solid #b89aff;color:#fff;font:800 18px sans-serif;pointer-events:none;box-shadow:0 0 18px #7a4aff'; $('#game').appendChild(qh); } if (qh) { qh.style.display = on ? 'block' : 'none'; if (on) qh.textContent = m0.att && m0.att.statue ? '🗿 동상 조종 중 — [Q] 원래 몸으로 돌아가기' : m0.att ? '☁ 붙는 중 — [Z] 떨어지기' : '☁ 안개 이동 중'; } }
   for (const t of hud.tags) {
     const f = t.f; v3.set(f.root.position.x, f.root.position.y + (f.form === 'dragon' ? 6.4 : 2.9), f.root.position.z).project(camera);
     const vis = v3.z < 1 && f.hp > 0 && !B.cut && !f.hidden && !f.bushHid;
@@ -174,4 +175,22 @@ export function glassFall() {
   const g = document.getElementById('glass'); if (!g) return;
   const l = g.querySelector('#glasslines'); if (l) l.style.opacity = 0;
   g.querySelectorAll('.shard').forEach(d => { const dx = (Math.random() - .5) * 40, dy = 70 + Math.random() * 60, rot = (Math.random() - .5) * 120; requestAnimationFrame(() => { d.style.transform = 'translate(' + dx + 'vw,' + dy + 'vh) rotate(' + rot + 'deg)'; d.style.opacity = 0; }); });
+}
+
+export function voidText(text) {   // 공허의 고치: 허무한 문구가 화면에 떠올랐다 사라진다
+  const s = document.createElement('div'); s.textContent = text; const rot = () => (Math.random() * 8 - 4);
+  s.style.cssText = 'position:absolute;left:' + (6 + Math.random() * 55) + '%;top:' + (10 + Math.random() * 70) + '%;font:700 ' + (26 + Math.random() * 30) + 'px serif;color:rgba(238,238,252,.95);text-shadow:0 0 16px #8a70ff,0 0 4px #000;letter-spacing:4px;pointer-events:none;z-index:32;opacity:0;transition:opacity .6s,transform 2.6s;transform:translateY(0) rotate(' + rot() + 'deg)';
+  const g = $('#game'); g.appendChild(s); requestAnimationFrame(() => { s.style.opacity = 1; s.style.transform = 'translateY(-26px) rotate(' + rot() + 'deg)'; });
+  setTimeout(() => { s.style.opacity = 0; }, 1800); setTimeout(() => s.remove(), 2700);
+}
+let pickKey = null;
+export function pick(title, items, cb) {   // 선택 창: 숫자키/클릭 = 선택, Esc = 취소. cb(index | -1)
+  const old = document.getElementById('pickv'); if (old) old.remove(); if (pickKey) { removeEventListener('keydown', pickKey, true); pickKey = null; }
+  const e = document.createElement('div'); e.id = 'pickv';
+  e.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;background:rgba(14,10,30,.92);border:2px solid #9a6aff;border-radius:12px;padding:16px 20px;min-width:340px;max-width:90%;color:#fff;font:600 16px sans-serif;box-shadow:0 0 30px #5a3acc';
+  const h = document.createElement('div'); h.textContent = title; h.style.cssText = 'margin-bottom:10px;color:#e0d0ff'; e.appendChild(h);
+  const done = i => { e.remove(); if (pickKey) { removeEventListener('keydown', pickKey, true); pickKey = null; } cb(i); };
+  items.forEach((t, i) => { const b = document.createElement('div'); b.textContent = (i + 1) + '. ' + t; b.style.cssText = 'padding:8px 10px;margin:4px 0;background:rgba(154,106,255,.18);border-radius:8px;cursor:pointer'; b.onpointerdown = ev => { ev.stopPropagation(); done(i); }; e.appendChild(b); });
+  pickKey = ev => { if (ev.code === 'Escape') { ev.stopPropagation(); ev.preventDefault(); done(-1); } else if (/^Digit[1-9]$/.test(ev.code)) { const i = +ev.code.slice(5) - 1; if (i < items.length) { ev.stopPropagation(); ev.preventDefault(); done(i); } } };
+  addEventListener('keydown', pickKey, true); $('#game').appendChild(e);
 }
