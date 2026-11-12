@@ -44,7 +44,7 @@ export function beginBattle(B) {
   const root = $('#hud'); root.innerHTML = ''; pops.forEach(p => p.el.remove()); pops = [];
   hud = { B, panels: [], tags: [] };
   B.fighters.forEach((f, i) => {
-    if ((B.explore || B.gem) && i > 0) { addTag(f); return; }
+    if ((B.explore || B.gem || B.sd) && i > 0) { addTag(f); return; }
     const keys = f.ctrl.kind === 'h2' ? ['7', '8', '9', '0'] : ['Z', 'X', 'C', 'V'];
     const mine = f.ctrl.kind === 'h1' || (f.ctrl.kind === 'h2' && B.mode === 'local');
     const p = document.createElement('div'); p.className = 'hpanel ' + (i ? 'right' : 'left');

@@ -4,7 +4,7 @@ export const isTouch = (() => { try { return /[?&]touch=1/.test(location.search)
 // game.js 가 매 프레임 읽는 입력 상태. mx/my 는 화면 기준(오른쪽 +, 아래 +), 조준은 화면 기준 방향과 길이
 export const TOUCH = { mx: 0, my: 0, atk: false, aim: null, until: 0 };
 
-let root, joy, knob, base, btns = [], api, fighter = null, camBtn;
+let root, joy, knob, base, btns = [], api, fighter = null, camBtn, relBtn;
 const KEYS = ['z', 'x', 'c', 'v', 'e', 'q', 'r'];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -24,6 +24,8 @@ function css() {
   .tb.hold{transform:scale(.94)}
   .tb.bound{filter:grayscale(.85) brightness(.75)}
   .tb.bound::after{content:'⛓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;background:repeating-linear-gradient(135deg,#0000 0 7px,#cfd4ff66 7px 9px);text-shadow:0 0 4px #000,0 0 8px #000}
+  .trel{left:50%;bottom:96px;transform:translateX(-50%);width:auto;height:52px;padding:0 22px;border-radius:26px;font-size:20px;background:linear-gradient(#b9a4ff,#8a6cff);color:#fff;-webkit-text-stroke:4px #2b1830;paint-order:stroke fill;z-index:3}
+  .trel.hold{transform:translateX(-50%) scale(.94)}
   #tcz{position:absolute;inset:0;pointer-events:auto;touch-action:none}
   .tdot{position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid #2b1830;pointer-events:none;display:none;z-index:2}
   #tcam{position:absolute;right:14px;top:74px;width:46px;height:46px;font-size:22px}
@@ -81,7 +83,7 @@ function mk(cls, label, sub, size, right, bottom) {
 
 export function showTouch(on, f) {
   if (!isTouch) return; fighter = on ? f : null;
-  btns.forEach(b => b.el.remove()); btns = []; camBtn && camBtn.remove(); camBtn = null; TOUCH.mx = TOUCH.my = 0; TOUCH.atk = false; TOUCH.aim = null;
+  btns.forEach(b => b.el.remove()); btns = []; camBtn && camBtn.remove(); camBtn = null; relBtn && relBtn.remove(); relBtn = null; TOUCH.mx = TOUCH.my = 0; TOUCH.atk = false; TOUCH.aim = null;
   root.classList.toggle('on', on); if (!on) return;
   const s = Math.min(1.15, Math.max(.8, innerHeight / 400));      // 화면 높이에 맞춰 버튼 크기 조절
   const atk = mk('atk', '평타', '', 100 * s, 22, 22); atk.querySelector('small')?.remove();
@@ -113,11 +115,16 @@ export function showTouch(on, f) {
   });
   camBtn = mk('', '👁', '', 46, 14, 0); camBtn.id = 'tcam'; camBtn.style.bottom = ''; camBtn.style.top = '74px';
   camBtn.addEventListener('pointerdown', () => api.toggleCam());
+  // 빙의 해제 버튼 (Q): 동상/다른 몸을 조종 중일 때만 화면 아래 가운데에 뜬다
+  relBtn = document.createElement('div'); relBtn.className = 'tb trel'; relBtn.innerHTML = '<span>🗿 Q · 원래 몸으로</span>'; relBtn.style.display = 'none'; root.appendChild(relBtn);
+  relBtn.addEventListener('pointerdown', e => { e.preventDefault(); relBtn.classList.add('hold'); api.press('q'); });
+  const relUp = () => relBtn.classList.remove('hold'); relBtn.addEventListener('pointerup', relUp); relBtn.addEventListener('pointercancel', relUp);
 }
 
 // 쿨타임/잠금 표시 (ui.js 의 슬롯과 같은 규칙)
 export function updateTouch() {
   const f = fighter; if (!f || !btns.length) return;
+  if (relBtn) { const on = !!(f.att && f.att.statueOf === f && f.att.hp > 0); if (relBtn.style.display !== (on ? 'flex' : 'none')) relBtn.style.display = on ? 'flex' : 'none'; }
   for (const b of btns) {
     if (!b.k) continue; const pf = f.att && f.att.statue && f.att.possBy === f ? f.att : f, k = b.k, sk = pf.def.skills[pf.form][k]; if (!sk) continue; const cd = pf.cd[k];
     const cdm = b.el.querySelector('.cdm'), cdt = b.el.querySelector('.cdt'), sm = b.el.querySelector('small');

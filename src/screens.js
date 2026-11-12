@@ -21,6 +21,10 @@ export const MODES = [
   { id: 'raid', title: '보스 레이드', desc: '4인 협동 보스 처치', long: '곧 열립니다.', chips: ['4인 협동', '보스 처치'], ready: false },
   { id: 'duel', title: '1v1 결투', desc: '1 vs 1 먼저 3승', long: 'AI 상대와 먼저 3승을 먼저 거두는 쪽이 이겨요. 이기면 코인 500, 져도 150.', chips: ['1 vs 1', '먼저 3승'], ready: true },
   { id: 'bounty', title: '3v3 바운티', desc: '3 vs 3 별 모으기', long: '적을 쓰러뜨려 별을 모으는 팀 대결이에요. 연속으로 처치하면 내 현상금(최대 ⭐7)이 올라가고, 쓰러지면 1로 돌아갑니다. 2분 15초 동안 별이 더 많은 팀이 승리하고, 쓰러져도 3.5초 뒤 부활해요. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '별 많은 팀 승리'], ready: true },
+  { id: 'solo', title: '솔로 쇼다운', desc: '8인 개인전 최후의 1인', long: '8명이 각자 싸우는 서바이벌이에요. 맵에 흩어진 파워 큐브를 먹으면 체력과 공격력이 10%씩 올라가고, 쓰러지면 큐브를 떨어뜨립니다. 시간이 지나면 독가스가 좁혀와요. 마지막까지 살아남으면 1위! 1위 코인 400, 상위권 200, 그 외 100.', chips: ['8인 개인전', '최후의 1인'], ready: true },
+  { id: 'duo', title: '듀오 쇼다운', desc: '2인 1팀 4팀 서바이벌', long: '2명이 한 팀이 되어 4팀이 맞붙는 서바이벌이에요. 파워 큐브를 모아 강해지고, 독가스가 좁혀옵니다. 마지막까지 살아남은 팀이 승리! 파티 슬롯에 초대한 쿠키가 파트너가 돼요. 1위 코인 400, 상위권 200, 그 외 100.', chips: ['2인 1팀', '4팀 서바이벌'], ready: true },
+  { id: 'trio', title: '트리플 쇼다운', desc: '3인 1팀 3팀 서바이벌', long: '3명이 한 팀이 되어 3팀이 싸우는 서바이벌이에요. 파워 큐브 + 좁혀오는 독가스. 마지막 한 팀만 이깁니다! 1위 코인 400, 상위권 200, 그 외 100.', chips: ['3인 1팀', '3팀 서바이벌'], ready: true },
+  { id: 'ko', title: '녹아웃', desc: '3 vs 3 라운드 대결', long: '3 vs 3 라운드 대결! 부활 없이 한 팀이 전멸하면 라운드가 끝나고, 먼저 2라운드를 따내면 승리해요. 라운드가 길어지면 독가스가 좁혀오고, 100초가 지나면 남은 체력이 많은 팀이 이깁니다. 이기면 코인 400, 져도 150.', chips: ['3 vs 3', '먼저 2라운드'], ready: true },
 ];
 const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   silent: { rar: '비스트', group: '딜러', role: '근접 검사', atk: 62, spd: 55, rng: 25 },
@@ -232,12 +236,22 @@ build.lobby = art => {
 /* ---------- 모드 선택 ---------- */
 const OLD_MODE = [['3v3 점령', '3 vs 3 거점 점령'], ['서바이벌', '10인 개인전 최후의 1인'], ['보물 쟁탈', '3 vs 3 보석 10개 모으기'], ['보스 레이드', '4인 협동 보스 처치'], ['1v1 결투', '1 vs 1 먼저 3승'], ['랭크 매치', '3 vs 3 시즌 랭킹']];
 build.mode = art => {
-  const panel = [...art.children].find(e => e.style.width === '1040px'), cards = [...panel.querySelectorAll(':scope>button')].filter(b => b.style.width === '320px');
+  const panel = [...art.children].find(e => e.style.width === '1040px'); let cards = [...panel.querySelectorAll(':scope>button')].filter(b => b.style.width === '320px');
+  { // 카드가 6칸 고정이라 모드가 늘어나면 스크롤 영역에 복제해서 이어 붙인다
+    const grid = document.createElement('div'); grid.style.cssText = 'position:absolute;left:0;top:144px;width:1032px;height:412px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin'; cards[0].before(grid);
+    const tmpl = cards[1].cloneNode(true), rows = Math.ceil(MODES.length / 3);
+    cards.forEach(c => { c.style.top = (parseInt(c.style.top) - 144) + 'px'; grid.appendChild(c); });
+    for (let i = cards.length; i < MODES.length; i++) {
+      const c = tmpl.cloneNode(true), m = MODES[i]; c.style.left = [20, 356, 692][i % 3] + 'px'; c.style.top = Math.floor(i / 3) * 212 + 'px'; c.style.outline = ''; c.style.outlineOffset = '';
+      setText(c, '서바이벌', m.title); setText(c, '10인 개인전', m.chips[0]); setText(c, '최후의 1인', m.chips[1]); grid.appendChild(c); cards.push(c);
+    }
+    const sp = document.createElement('div'); sp.style.cssText = 'position:absolute;left:0;width:1px;height:1px;top:' + (rows * 212 - 4) + 'px'; grid.appendChild(sp);
+  }
   const bTitle = findText(art, '3v3 점령', 1), bDesc = textNodes(art).find(t => t.data.trim().startsWith('3명이 한 팀')), bBtn = btnByText(panel, '선택하기');
   const OUT = cards[0].style.outline, outOff = cards[0].style.outlineOffset, badge = [...cards[0].querySelectorAll('span')].find(s => s.textContent.trim() === '선택됨');
   let sel = Math.max(0, MODES.findIndex(m => m.id === st.mode));
   const OLD_CHIP = [['3 vs 3', '거점 점령'], ['10인 개인전', '최후의 1인'], ['3 vs 3', '보석 10개 모으기'], ['4인 협동', '보스 처치'], ['1 vs 1', '먼저 3승'], ['3 vs 3', '시즌 랭킹']];
-  cards.forEach((card, i) => { const m = MODES[i]; if (!m) return; setText(card, OLD_MODE[i][0], m.title); setText(card, OLD_CHIP[i][0], m.chips[0]); setText(card, OLD_CHIP[i][1], m.chips[1]); });
+  cards.forEach((card, i) => { const m = MODES[i]; if (!m || !OLD_MODE[i]) return; setText(card, OLD_MODE[i][0], m.title); setText(card, OLD_CHIP[i][0], m.chips[0]); setText(card, OLD_CHIP[i][1], m.chips[1]); });
   const paint = () => {
     cards.forEach((c, i) => { c.style.outline = i === sel ? OUT : ''; c.style.outlineOffset = i === sel ? outOff : ''; c.setAttribute('aria-pressed', i === sel); if (badge) { if (i === sel) c.appendChild(badge); } });
     bTitle.data = MODES[sel].title; bDesc.data = MODES[sel].long;
