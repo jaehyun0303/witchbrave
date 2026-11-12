@@ -120,7 +120,7 @@ export function buildCookie(def) {
   if (id === 'dark' && darkReady()) applyDark(rig);
   if (id === 'shadow' && shadowReady()) applyShadow(rig);
   if ((id === 'pv' || id === 'silent') && fbxReady(id)) applyFbx(id, rig);
-  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA' || id === 'dkk' || id === 'dkkA' || id === 'pitaya' || id === 'ananas' || id === 'timekeeper' || id === 'berry' || id === 'lilyA' || id === 'burnB' || id === 'mystic' || id === 'gold' || id === 'goldA' || id === 'mysticA' || id === 'mysticB') && vcReady(id)) applyVC(id, rig);
+  if ((id === 'burn' || id === 'lily' || id === 'pva' || id === 'burnA' || id === 'dkk' || id === 'dkkA' || id === 'pitaya' || id === 'ananas' || id === 'timekeeper' || id === 'berry' || id === 'berryA' || id === 'lilyA' || id === 'burnB' || id === 'mystic' || id === 'gold' || id === 'goldA' || id === 'mysticA' || id === 'mysticB') && vcReady(id)) applyVC(id, rig);
   root.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return rig;
 }

@@ -70,7 +70,7 @@ function hurt(src, t, n, o = {}) {
   if (t.holy > 0 && src && src !== t && !ally(src, t) && !o.refl) { if (!o.quiet || Math.random() < .2) ui.pop(P3(t, 2.6), '🛡 반사!', '#ffd0dc'); if (src.hp > 0) hurt(t, src, n * .5, { refl: true, quiet: true, field: true }); return; }   // 베리 홀리: 막고 절반을 반사
   let d = n * (src ? dmgMul(src) : 1) * (1 - defRed(t));
   if (t.dscale > 0 && src && src !== t && !ally(src, t) && !o.refl && !o.charmR) hurt(t, src, n * .4, { refl: true, quiet: true, field: true });   // 용의 비늘: 같은 공격이 40% 로 되돌아간다
-  d = hbHurtAdjust(t, src, d, o); if (t.tdeb > 0) d *= 1.1; if (t.meatDeb > 0) d *= 1.05;   // 시간지기의 평타: 받는 피해 +10%   // 홀리베리: z 피해 감소 / v 불굴(자신 85%, 아군 40% + 대신 맞기)
+  d = hbHurtAdjust(t, src, d, o); d = baHurtAdjust(t, src, d, o); if (d <= 0 && t.ffT > 0) { if (!o.quiet || Math.random() < .1) ui.pop(P3(t, 2.6), '✨ 무적', '#ffd0dc'); return; } if (t.curse) d *= 1.6; if (t.tdeb > 0) d *= 1.1; if (t.meatDeb > 0) d *= 1.05;   // 시간지기의 평타: 받는 피해 +10%   // 홀리베리: z 피해 감소 / v 불굴(자신 85%, 아군 40% + 대신 맞기)
   if (t.drT > 0) d *= 1 - t.drV;
   if (t.cocoon) { const c = t.cocoon; c.hp -= d; t.cmb = B.time; if (src && src !== t) src.cmb = B.time; ui.pop(P3(t, 2.6), '🕸 ' + Math.round(d), '#e8e8f0'); c.mesh.scale.setScalar(1.12); setTimeout(() => c.mesh && c.mesh.scale.setScalar(1), 80); if (c.hp <= 0) cocoonBreak(t); return; }
   if (t.gabs) { t.gabs.sum += d; t.cmb = B.time; if (src && src !== t) src.cmb = B.time; if (!o.quiet || Math.random() < .2) ui.pop(P3(t, 2.6), '✦ ' + Math.round(d), '#ffd84a'); vfx.burst('glow', P3(t, 1.6), 3, { speed: 3, life: .4, size: .5, c0: 0xffffff, c1: 0xffd84a }); return; }
@@ -82,6 +82,7 @@ function hurt(src, t, n, o = {}) {
   if (o.proj && o.proj.sbreak && src && t.shield > 0 && !ally(src, t)) { const sh = t.shield; t.shield = 0; src.shield = (src.shield || 0) + sh; src.shieldMax = Math.max(src.shieldMax || 0, src.shield); ui.pop(P3(src, 3.4), '🛡 흡수 +' + Math.round(sh), '#ffe9a0'); ui.pop(P3(t, 3), '🛡 파괴!', '#ffd84a'); }
   let hpD = d; if (t.shield > 0) { const ab = Math.min(t.shield, d); t.shield -= ab; hpD = d - ab; }
   t.hp = Math.max(0, t.hp - hpD - pierce); t.flash = .12; d += pierce; t.cmb = B.time; if (src && src !== t) src.cmb = B.time;
+  if (t.def.id === 'berryA' && d > 0 && !o.baShare) baShare(t, d);
   if (d > 0 && src && src !== t && !ally(src, t) && B.pfields && B.pfields.length) { const pf = B.pfields.find(p => p.owner.hp > 0 && (p.owner === t || ally(p.owner, t)) && realmOf(p.owner) === realmOf(t) && Math.hypot(t.x - p.x, t.y - p.y) < p.R); if (pf) { t.shield = (t.shield || 0) + d; t.shieldMax = Math.max(t.shieldMax || 0, t.shield); if (!o.quiet || Math.random() < .2) ui.pop(P3(t, 3.2), '🛡 +' + Math.round(d), '#ffc0e0'); } }   // 용언의 보호막: 맞은 만큼 보호막
   if (d > 0 && !t.minion) { const L = t.dmgLog || (t.dmgLog = []); L.push([B.time, d]); while (L.length && L[0][0] < B.time - 60) L.shift(); }   // 최근 1분 받은 피해 기록 (시간의 장판)
   if (B.raid && t === B.raid.boss && src === B.fighters[0]) B.raid.dmg += d;
@@ -575,7 +576,7 @@ const lichFx = {
   },
   charm(f, e) {   // 암흑의 매혹: 대상 발밑에 거대한 하트 룬 + 위로 솟는 하트 소용돌이
     const c = { x: P3(e).x, z: P3(e).z };
-    vfx.decal(c, { tex: 'rune', r: 3.8, color: LCP, dur: 2.2, alpha: .85, spin: -1.6, y: .07 });
+    vfx.decal(c, { tex: 'heart_rune', r: 3.8, color: LCP, dur: 2.2, alpha: .85, spin: -1.6, y: .07 });
     vfx.decal(c, { tex: 'rune', r: 2.4, color: LCV, dur: 2, alpha: .7, spin: 2.2, y: .08 });
     vfx.decal(c, { tex: 'ring', r: 4.4, color: 0xffffff, dur: 1.2, alpha: .6, y: .06 });
     for (let i = 0; i < 4; i++) setTimeout(() => { if (B) vfx.burst('heart', P3(e, .4), 10, { speed: 1.5, speed2: 4, life: 1, life2: 1.6, size: .6, c0: 0xffffff, c1: LCP, a: .9, drag: .5, up: 5 }); }, i * 220);
@@ -778,7 +779,7 @@ function startVeil(f) {
   if (f.soul) { const R = Math.sqrt(.1 * W * H / Math.PI); reg = { kind: 'disc', x: e.x, y: e.y, r: R }; geo = new THREE.CircleGeometry(R * S, 48); center = W3(e.x, e.y, .09); }
   else { const left = e.x < W / 2; reg = { kind: 'rect', x0: left ? 0 : W / 2, x1: left ? W / 2 : W, y0: 0, y1: H }; geo = new THREE.PlaneGeometry(W / 2 * S, H * S); center = W3(left ? W / 4 : W * .75, H / 2, .09); }
   geo.rotateX(-Math.PI / 2);
-  const group = new THREE.Group(), plane = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x0a1a5e, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); plane.position.copy(center); plane.renderOrder = 3; group.add(plane);
+  const group = new THREE.Group(), plane = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x2f5be0, transparent: true, opacity: .2, depthWrite: false, side: THREE.DoubleSide })); plane.position.copy(center); plane.renderOrder = 3; group.add(plane);
   const eyes = [], n = f.soul ? 10 : 42;
   for (let i = 0; i < n; i++) {
     let x, y; if (reg.kind === 'rect') { x = rnd(reg.x0 + 30, reg.x1 - 30); y = rnd(30, H - 30); } else { const a = rnd(0, 6.283), d = Math.sqrt(Math.random()) * reg.r * .9; x = reg.x + Math.cos(a) * d; y = reg.y + Math.sin(a) * d; }
@@ -792,7 +793,7 @@ function endVeil(f) { const v = f.veil; if (!v) return; world.scene.remove(v.gro
 function updVeil(f, dt) {
   const v = f.veil; v.t += dt; const e = foe(f);
   v.eyes.forEach(ey => { ey.lookAt(camera.position); const bl = Math.abs(Math.sin(v.t * 1.4 + ey.userData.ph)); ey.scale.set(ey.userData.sc, ey.userData.sc * (bl > .93 ? .15 : 1), ey.userData.sc); });
-  if (e.hp > 0 && !immune(e) && !inBarrier(f, e) && inReg(v.reg, e)) { slowOn(e, .3, .55); e.st.rev = .3; if (Math.random() < .3) vfx.emit('glow', { x: e.root.position.x + rnd(-.6, .6), y: 2.4, z: e.root.position.z + rnd(-.6, .6), vy: 1, life: .6, s0: .35, s1: 0, c0: 0x9fb8ff }); }
+  if (e.hp > 0 && !immune(e) && !inBarrier(f, e) && inReg(v.reg, e)) { slowOn(e, .3, .55); e.st.rev = .3; if (e === B.fighters[0] && (v.warnT || 0) <= B.time) { v.warnT = B.time + 2.5; ui.toast('🌀 거짓의 장막 — 이동이 반대로 되고 느려져요! (장막 밖으로 나가세요)'); } if (Math.random() < .3) vfx.emit('glow', { x: e.root.position.x + rnd(-.6, .6), y: 2.4, z: e.root.position.z + rnd(-.6, .6), vy: 1, life: .6, s0: .35, s1: 0, c0: 0x9fb8ff }); }
   if (v.t >= v.dur) { endVeil(f); ui.pop(P3(f, 3.2), '장막 해제', '#9fb8ff'); }
 }
 // 궁극기: 유체이탈
@@ -2606,7 +2607,9 @@ function updLichA(dt) {
     // --- 환각 정리 ---
     if (f.illuClone && (f.illuClone.hp <= 0 || f.illuClone.ttl <= 0 || f.hp <= 0)) { f.illuClone.hp = Math.min(f.illuClone.hp, 0); f.illuClone = null; f.nofoe = false; f.hidden = false; vfx.burst('glow', P3(f, 1.4), 20, { speed: 3, life: .6, size: .8, c0: 0xffffff, c1: LCH }); ui.pop(P3(f, 3.8), '👁 환각 해제', '#e0b8ff'); }
     // --- 이동기(넉백) ---
-    if (f.kb) { f.x = clamp(f.x + f.kb.vx * dt, PAD, W - PAD); f.y = clamp(f.y + f.kb.vy * dt, PAD, H - PAD); f.kb.t -= dt; if (f.kb.t <= 0) f.kb = null; }
+    if (f.kb) { const nx = f.x + f.kb.vx * dt, ny = f.y + f.kb.vy * dt; f.x = clamp(nx, PAD, W - PAD); f.y = clamp(ny, PAD, H - PAD); f.kb.t -= dt;
+      if (f.kb.stun && (Math.abs(f.x - nx) > .5 || Math.abs(f.y - ny) > .5 || B.objs.some(o => (o.realm || 0) === realmOf(f) && Math.hypot(o.x - f.x, o.y - f.y) < f.r + o.r + 6))) { f.st.stun = Math.max(f.st.stun, f.kb.stun); ui.pop(P3(f, 4.2), '💥 충돌 스턴!', '#ffe066', true); vfx.impact(P3(f, 1.3), 0xffffff, 1.2); shake(.5, .2); f.kb = null; }
+      else if (f.kb.t <= 0) f.kb = null; }
     if (f.fear > 0) f.fear -= dt; if (f.pinkT > 0) f.pinkT -= dt;
   }
   ui.fear(B.fighters[0] && B.fighters[0].fear > 0); ui.pink(B.fighters[0] && B.fighters[0].pinkT > 0);
@@ -3070,6 +3073,129 @@ CHARS.berry = {
     }
   }
 };
+/* ===== 각성 홀리베리 쿠키 (id 'berryA', HP 45000, 받는 피해 50%) ===== */
+const baFoes = (f, r) => B.fighters.filter(t => t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f) && dist(f, t) < r + t.r);
+function baShieldMesh(sc = 1) {   // 거대 방패 (육각 방패: 분홍 반투명 면 + 흰 테두리)
+  const g = new THREE.Group(), R = 3.2 * sc;
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(R, R * .82, .5 * sc, 6), new THREE.MeshStandardMaterial({ color: 0xffd0dc, emissive: 0xff5a80, emissiveIntensity: .9, metalness: .5, roughness: .3, transparent: true, opacity: .8 })); face.rotation.x = Math.PI / 2; g.add(face);
+  g.add(new THREE.Mesh(new THREE.TorusGeometry(R * .96, .22 * sc, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+  const core = new THREE.Mesh(new THREE.TorusGeometry(R * .5, .14 * sc, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffb0c8 })); core.position.z = .3 * sc; g.add(core);
+  return g;
+}
+function baKb(t, a, sp, tm, stun) { t.kb = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: tm, stun }; }   // stun: 벽/지형에 부딪히면 걸리는 스턴(초)
+function baPush(f) {   // 평타: 거대 방패를 소환해 밀쳐낸다
+  setAnim(f, 'slash', .3); const a = f.face, ar = f.area || 1, dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), base = P3(f, 1.9), sh = baShieldMesh(1.15);
+  addFxm(sh, .42, (u, m) => { const k = Math.min(1, u * 4); m.position.copy(base).add(dir.clone().multiplyScalar((1.5 + k * 4.5) * ar)); m.rotation.y = -a + Math.PI / 2; m.scale.setScalar(Math.max(.001, (.6 + k * .6) * (u > .7 ? 1 - (u - .7) * 3.3 : 1) * ar)); });
+  const tip = P3(f, 1.2).add(dir.clone().multiplyScalar(6 * ar)); vfx.impact(tip, HBR, .8); vfx.ring(P3(f), { r0: .5, r1: 7 * ar, dur: .35, color: 0xffd0dc, alpha: .7, noRim: true });
+  for (const t of baFoes(f, 340 * ar)) { const aa = ang(f, t), df = Math.atan2(Math.sin(aa - a), Math.cos(aa - a)); if (Math.abs(df) > .95) continue; hurt(f, t, 200, { dir: aa }); baKb(t, aa, 1500, .3, 1.8); }
+}
+function baSpinStart(f) {   // z: 거대 방패를 두른 채 20초 동안 회전 공격
+  setAnim(f, 'cast', .4); const g = new THREE.Group(), sh = baShieldMesh(1); sh.position.set(0, 0, 4.4); g.add(sh); const sh2 = baShieldMesh(1); sh2.position.set(0, 0, -4.4); sh2.rotation.y = Math.PI; g.add(sh2); addExtra(g);
+  const ring = vfx.decal(P3(f), { tex: 'ring', r: 330 * S, color: 0xff7a9a, alpha: .8, y: .08, spin: 2 });
+  f.baSpin = { t: 20, acc: 0, g, ring }; ui.pop(P3(f, 4.2), '🛡 방패 회전!', '#ffd0dc', true); vfx.ring(P3(f), { r0: .5, r1: 12, dur: .6, color: HBR });
+}
+function baSpinEnd(f, slam) {
+  const s = f.baSpin; if (!s) return; f.baSpin = null; rmExtra(s.g); vfx.remove(s.ring); f.cd.z = 20;
+  if (slam && f.hp > 0) {   // 마지막: 방패로 쿵 — 500 + 내가 750 회복
+    setAnim(f, 'slash', .35); shock(f, 340 * (f.area || 1), HBR, 500); shake(1.4, .45); B.hitstop = Math.max(B.hitstop, .08); vfx.column(P3(f), { r: 3, h: 16, dur: .5, color: 0xffb0c8, alpha: .7 });
+    f.hp = Math.min(f.max, f.hp + 750); ui.pop(P3(f, 3.8), '+750', '#7dff9b', true);
+  }
+}
+function baRush(f) {   // x: 방패 러쉬 — 방패를 앞에 두고 밀어서 쓸어버린다
+  setAnim(f, 'cast', .25); const a = f.face, sx = f.x, sy = f.y, ar = f.area || 1, hit = [], sh = baShieldMesh(1.5); addExtra(sh); const T = .75, DIST = 820;
+  act(f, T, (u) => {
+    const e = 1 - (1 - u) * (1 - u); let nx = sx + Math.cos(a) * DIST * e, ny = sy + Math.sin(a) * DIST * e; f.x = clamp(nx, PAD, W - PAD); f.y = clamp(ny, PAD, H - PAD); f.face = a; f.st.inv = Math.max(f.st.inv, .1);
+    const p = P3(f, 1.9), sp = p.clone().add(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(4.2 * ar)); sh.position.copy(sp); sh.rotation.y = -a + Math.PI / 2; sh.scale.setScalar(ar);
+    if (Math.random() < .6) vfx.emit('glow', { x: sp.x, y: rnd(.6, 3), z: sp.z, vx: -Math.cos(a) * 4, vz: -Math.sin(a) * 4, life: .4, s0: 1, s1: 0, c0: 0xffd0dc, a: .6 });
+    for (const t of baFoes(f, 200 * ar)) if (!hit.includes(t)) {
+      const aa = ang(f, t), df = Math.atan2(Math.sin(aa - a), Math.cos(aa - a)); if (Math.abs(df) > 1.2) continue;
+      hit.push(t); hurt(f, t, 2200, { dir: a }); t.baMark = { t: 10, by: f }; ui.pop(P3(t, 4), '🛡 표식 10초', '#ffb0c0', true); vfx.impact(P3(t, 1.3), HBR, 1.4);
+    }
+    for (const t of hit) if (t.hp > 0) {   // 맞은 적은 방패에 실려 밀려간다. 벽·지형에 부딪히면 스턴
+      const d = f.r + t.r + 80 * ar, px = f.x + Math.cos(a) * d, py = f.y + Math.sin(a) * d, cx = clamp(px, PAD, W - PAD), cy = clamp(py, PAD, H - PAD);
+      t.x = cx; t.y = cy; t.st.stun = Math.max(t.st.stun, .25);
+      const wall = Math.abs(cx - px) > 1 || Math.abs(cy - py) > 1, obj = B.objs.some(o => (o.realm || 0) === realmOf(t) && Math.hypot(o.x - t.x, o.y - t.y) < t.r + o.r + 6);
+      if (wall || obj) { t.st.stun = Math.max(t.st.stun, 1.8); ui.pop(P3(t, 4.2), '💥 충돌 스턴!', '#ffe066', true); vfx.impact(P3(t, 1.3), 0xffffff, 1.2); hit.splice(hit.indexOf(t), 1); hit.push({ dead: 1 }); }
+    }
+  }, () => { rmExtra(sh); for (const t of hit) if (t.hp > 0 && t.x !== undefined) baKb(t, a, 600, .2, 1.8); });
+}
+function baField(f) {   // c: 포스필드 — 아군 무적 보호막 30초, 내가 5% 만 대신 맞는다
+  setAnim(f, 'cast', .5); ui.flash('#ff7a9a', .5, .5); shake(.8, .5);
+  for (const o of hbAllies(f)) {
+    o.ffT = 30; o.ffBy = f; if (o.ffMesh) rmExtra(o.ffMesh);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: 0xff7a9a, transparent: true, opacity: .26, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.scale.setScalar(2.4 * (o.big || 1)); addExtra(m); o.ffMesh = m;
+    vfx.column(P3(o), { r: 1.6, h: 14, dur: .8, color: HBR, alpha: .5 }); vfx.ring(P3(o), { r0: .5, r1: 8, dur: .7, color: 0xffd0dc }); ui.pop(P3(o, 4), o === f ? '🛡 포스필드 (받는 피해 30%)' : '🛡 포스필드 (무적)', '#ffd0dc', true);
+  }
+}
+function baFieldEnd(o) { if (o.ffMesh) { rmExtra(o.ffMesh); o.ffMesh = null; } o.ffT = 0; o.ffBy = null; }
+function baSky(f) {   // v: 하늘에 거대한 방패 형상 → 적 보호막 흡수 / 보호막 없는 적은 저주 → 방패가 내게 흡수되어 최대 체력 증가
+  if (f.baV) return false; setAnim(f, 'roar', .8); ui.flash('#ff7a9a', .5, .6); shake(.8, .5);
+  const g = baShieldMesh(5); addExtra(g); g.rotation.x = -Math.PI / 2 + .3; f.baV = { t: 0, abs: 0, g, did: false }; ui.pop(P3(f, 4.6), '🛡 열정의 홀리베리!', '#ffd0dc', true);
+}
+function baSkyEnd(f) { const s = f.baV; if (!s) return; rmExtra(s.g); f.baV = null; f.cd.v = 70; }
+function baHurtAdjust(t, src, d, o) {   // 받는 피해 50%, 포스필드 중엔 30%. 포스필드로 막힌 아군 피해는 0 (홀리베리가 5% 대신 맞는다)
+  if (t.def.id === 'berryA') return d * (t.ffT > 0 ? .3 : .5);
+  if (t.ffT > 0 && t.ffBy && t.ffBy.hp > 0 && t.ffBy !== t && ally(t.ffBy, t)) { const b = t.ffBy, take = d * .05; if (take > 0) { b.hp = Math.max(1, b.hp - take); b.flash = .1; b.cmb = B.time; if (!o.quiet || Math.random() < .15) ui.pop(P3(b, 3 + rnd(0, 1)), '🛡 대신 ' + Math.round(take), '#ffb0c0'); } return 0; }
+  return d;
+}
+function baShare(t, d) {   // x 표식: 홀리베리가 맞은 피해의 10% 가 표식 걸린 적에게도 들어간다
+  for (const o of B.fighters) if (o.baMark && o.baMark.by === t && o.baMark.t > 0 && o.hp > 0 && realmOf(o) === realmOf(t)) hurt(t, o, d * .1, { refl: true, quiet: true, field: true, baShare: true });
+}
+function updBerryA(dt) {
+  for (const f of B.fighters) {
+    if (f.baMark) { f.baMark.t -= dt; if (f.baMark.t <= 0 || f.hp <= 0) f.baMark = null; }
+    if (f.ffT > 0) {
+      f.ffT -= dt; const b = f.ffBy; if (f.ffMesh) { const p = P3(f, 1.4); f.ffMesh.position.copy(p); f.ffMesh.rotation.y += dt; f.ffMesh.material.opacity = .22 + Math.sin(B.time * 4) * .06; }
+      if (f.ffT <= 0 || !b || b.hp <= 0 || f.hp <= 0) baFieldEnd(f);
+    }
+    const s = f.baSpin;
+    if (s) {
+      if (f.hp <= 0) baSpinEnd(f, false);
+      else {
+        s.t -= dt; s.acc += dt; s.g.position.copy(P3(f, 1.9)); s.g.rotation.y += dt * 8; s.g.scale.setScalar(f.area || 1); const p = P3(f); s.ring.obj.position.set(p.x, s.ring.obj.position.y, p.z);
+        if (s.acc >= .25) {
+          s.acc -= .25; const ar = f.area || 1;
+          for (const t of baFoes(f, 330 * ar)) { hurt(f, t, 25, { quiet: true, dir: ang(f, t) }); if (Math.random() < .3) { ui.pop(P3(t, 2.8 + rnd(0, 1)), Math.round(25 * dmgMul(f)), HBR, false); vfx.burst('spark', P3(t, 1.3), 4, { speed: 6, life: .25, size: .35, c0: 0xffffff, c1: 0xff7a9a }); } }
+        }
+        if (s.t <= 0) baSpinEnd(f, true);
+      }
+    }
+    const v = f.baV;
+    if (v) {
+      if (f.hp <= 0) { baSkyEnd(f); continue; }
+      v.t += dt; const T = v.t, sky = v.g, p = P3(f);
+      if (T < 4) { const k = Math.min(1, T / 1.3); sky.position.set(p.x, lerp(46, 30, k), p.z); sky.scale.setScalar(.4 + k * 1.2); sky.rotation.z += dt * .6; }
+      if (T >= 1.3 && !v.did) {
+        v.did = true; shake(1, .6);
+        for (const t of B.fighters) if (t !== f && !ally(f, t) && t.hp > 0 && realmOf(t) === realmOf(f)) {
+          const a0 = P3(t, 1.6);
+          if (t.shield > 0) { const take = Math.min(t.shield, 20000); v.abs += take; t.shield = 0; ui.pop(P3(t, 4), '🛡 보호막 흡수 -' + Math.round(take), '#ffd0dc', true); vfx.line('glow', a0, sky.position, 16, { size: 1, size1: .2, c0: 0xffffff, c1: 0xff7a9a, life: .9, rad: .4 }); }
+          else if (!t.curse) { t.curse = true; ui.pop(P3(t, 4), '🔥 불꽃정령의 저주! (받는 피해 160%)', '#ff9a5a', true); vfx.burst('glow', a0, 30, { speed: 3, speed2: 9, life: 1, size: 1.2, c0: 0xffe0a0, c1: 0xff4a10, up: 4 }); vfx.column(P3(t), { r: 1.8, h: 14, dur: .9, color: 0xff5a20, alpha: .6 }); }
+        }
+      }
+      if (T >= 3.6) { const k = Math.min(1, (T - 3.6) / 1.1); sky.position.lerp(P3(f, 2), k * .25 + .05); sky.scale.setScalar(Math.max(.05, 1.6 * (1 - k))); }
+      if (T >= 4.7) {
+        if (v.abs > 0) { f.max += v.abs; f.hp = Math.min(f.max, f.hp + v.abs); ui.pop(P3(f, 4.2), '❤ 최대 체력 +' + Math.round(v.abs).toLocaleString(), '#7dff9b', true); }
+        else ui.pop(P3(f, 4.2), '흡수할 보호막이 없었다', '#ffd0dc');
+        vfx.ring(P3(f), { r0: .5, r1: 10, dur: .7, color: HBR }); vfx.column(P3(f), { r: 2, h: 16, dur: .8, color: 0xffd0dc, alpha: .7 }); ui.flash('#ffd0dc', .5, .4); baSkyEnd(f);
+      }
+    }
+  }
+}
+CHARS.berryA = {
+  id: 'berryA', base: 'berry', name: '각성 홀리베리 쿠키', color: HBR, fx: 0xffa0b8, cost: 0, hp: 45000, pref: 4.2, atkRange: 240, aiPref: 130, tag: '각성 · 피해 50% · 거대 방패 · 포스필드 · 불꽃정령의 저주',
+  passive: '[불굴의 방패] 받는 피해가 항상 50% (포스필드 중엔 30%).',
+  skills: {
+    base: {
+      a: { name: '방패 밀치기', cd: .9, desc: '거대한 방패(보호막)를 소환해 적을 밀쳐내며 200. 밀려난 적이 벽이나 지형에 부딪히면 스턴. 방패는 유지되지 않는다', use(f) { baPush(f); } },
+      z: { name: '방패 회전', cd: 20, desc: '거대 방패를 두른 채 20초 동안 회전하며 총 2000. 마지막에 방패로 쿵 찍어 500 + 내가 750 회복. 다시 누르면 바로 쿵', use(f) { if (f.baSpin) { baSpinEnd(f, true); return 'nocd'; } baSpinStart(f); return 'nocd'; } },
+      x: { name: '방패 러쉬', cd: 14, desc: '거대 방패를 앞세워 밀고 나가 적을 쓸어버린다 2200. 맞은 적은 10초 동안 내가 맞은 피해의 10% 를 같이 받는다. 벽·지형에 부딪히면 스턴', use(f) { baRush(f); } },
+      c: { name: '포스필드', cd: 45, desc: '아군에게 무적의 보호막 30초. 막힌 적의 공격 피해는 내가 5% 만 대신 맞고, 그동안 내가 받는 피해는 공격의 30%. (대신 맞기와 내 피해 감소는 별개)', use(f) { baField(f); } },
+      v: { name: '열정의 홀리베리', cd: 70, desc: '하늘에 거대한 방패 형상을 소환해 적의 방어막을 모두 흡수. 방어막이 없는 적은 불꽃정령 쿠키의 저주(영원히 받는 피해 160%). 방패는 마지막에 내게 흡수되어 흡수한 만큼 최대 체력 증가', use(f) { return baSky(f); } },
+    }
+  }
+};
+CHARS.berry.awakeId = 'berryA';
 /* ===== 시간지기 쿠키 (id 'timekeeper', 레전더리) ===== */
 const TKC = 0xffd070;
 const recentDmg = f => { const L = f.dmgLog; if (!L) return 0; let s = 0; for (const [t, d] of L) if (t > B.time - 60) s += d; return s; };   // 최근 1분간 받은 피해
@@ -4265,7 +4391,7 @@ CHARS.mob_mandu_spicy = mobDef('mob_mandu_spicy', '매운만두 사천왕', SPC,
   x: { name: '굴러가는 밀대', cd: 10, desc: '거대한 밀대를 굴려 보낸다. 지나가는 길의 적에게 1000', use(f) { setAnim(f, 'cast', .3); shoot(f, { a: f.face, sp: 430, r: 58, dmg: 1000, pierce: true, color: 0xffc040, kind: 'pin', life: 1.9 }); shake(.4, .3); ui.pop(P3(f, 3.8), '🥖 밀대!', '#ffd070', true); } },
   c: { name: '만두 분신술', cd: 40, desc: '분열: 나와 분신 모두 체력 2500, 주는 피해 절반', use(f) {
     if (f.manduClone) return false; setAnim(f, 'cast', .4); f.max = 2500; f.hp = Math.min(f.hp, 2500); f.pm = (f.pm || 1) * .5; ui.pop(P3(f, 4), '🥟 분신술!', '#ffd0a0', true);
-    for (let i = 0; i < 2; i++) { const m = addMinion(f.def.id, clamp(f.x + (i ? 130 : -130), PAD, W - PAD), clamp(f.y + rnd(-60, 60), PAD, H - PAD), { hp: 2500, big: 1.5, realm: f.realm }); m.team = f.team; m.pm = .5; m.manduClone = true; m.cd.c = 1e9; vfx.burst('glow', P3(m, 1.2), 30, { speed: 4, speed2: 10, life: .8, size: .9, c0: 0xffffff, c1: SPC }); }
+    for (let i = 0; i < 2; i++) { const m = addMinion(f.def.id, clamp(f.x + (i ? 130 : -130), PAD, W - PAD), clamp(f.y + rnd(-60, 60), PAD, H - PAD), { hp: 2500, big: 1.5, realm: f.realm }); m.team = f.team; m.pm = .5; m.manduClone = true; m.cloneOf = f; m.cd.c = 1e9; vfx.burst('glow', P3(m, 1.2), 30, { speed: 4, speed2: 10, life: .8, size: .9, c0: 0xffffff, c1: SPC }); }
     vfx.ring(P3(f), { r0: .5, r1: 6, dur: .6, color: SPC }); } },
   v: { name: '만두 브레스', cd: 45, desc: '주위를 20초간 불바다(초당 100). 분노: 커지고 체력·데미지 +30%', use(f) {
     setAnim(f, 'cast', .5); const R2 = 360, p = P3(f); B.mfire = B.mfire || [];
@@ -4350,6 +4476,7 @@ CHARS.mob_mandu_shrimp = mobDef('mob_mandu_shrimp', '새우만두 사천왕', SH
 CHARS.mob_mandu_spicy.mandu = 'spicy'; CHARS.mob_mandu_leek.mandu = 'leek'; CHARS.mob_mandu_meat.mandu = 'meat'; CHARS.mob_mandu_shrimp.mandu = 'shrimp';
 function updMandu(dt) {
   for (const f of B.fighters) {
+    if (f.manduClone && f.hp > 0 && f.cloneOf && f.cloneOf.hp <= 0) { f.hp = 0; ui.pop(P3(f, 3), '🥟 분신 소멸', '#ffd0a0'); }   // 본체가 쓰러지면 분신도 사라진다
     if (f.meatDeb > 0) f.meatDeb -= dt;
     if (f.fillT > 0) { f.fillT -= dt; if (f.fillT <= 0 && f.fill0) { f.big = f.fill0.big; f.pm = f.fill0.pm; f.fill0 = null; ui.pop(P3(f, 3.6), '알찬 만두 종료', '#ffd8a0'); } }
     if (f.cast && f.cast.type === 'mc') {
@@ -4998,6 +5125,7 @@ function aiInput(f) {
     if (f.def.id === 'ananas' && ((k === 'z' && (f.rrain || d > 950)) || (k === 'x' && (f.yz || d > 1200)) || (k === 'c' && (d > 1000 || d < 150)) || (k === 'v' && (B.reign || f.reignT > 0 || d > 1100)))) continue;
     if (f.def.id === 'pitaya' && ((k === 'z' && (f.pbr || d > 700)) || (k === 'x' && (f.dscale > 0 || d > 600)) || (k === 'c' && (d > 950 || d < 250)) || (k === 'v' && (f.pfield || d > 700)))) continue;
     if (f.def.id === 'timekeeper' && ((k === 'z' && (f.rift ? f.rift.t < 6 : d > 800)) || (k === 'x' && d > 850) || (k === 'c' && (d > 900 || B.voidR)) || (k === 'v' && d > 1100))) continue;
+    if (f.def.id === 'berryA' && ((k === 'z' && (f.baSpin || d > 340)) || (k === 'x' && (d > 800 || d < 120)) || (k === 'c' && (f.ffT > 0 || f.hp / f.max > .8)) || (k === 'v' && (f.baV || d > 900)))) continue;
     if (f.def.id === 'berry' && ((k === 'z' && d > 300) || (k === 'x' && (f.holy > 0 || d > 700 || f.hp / f.max > .85)) || (k === 'c' && (d > 900 || d < 220)) || (k === 'v' && (f.hbV > 0 || d > 800)))) continue;
     if (f.def.id === 'lilyA') {
       if (f.form === 'angel') { if ((k === 'z' && d > 750) || (k === 'x' && (d > 900 || f.souls)) || (k === 'c' && f.absorb) || (k === 'v' && !(f.absorb && f.absorb.list.length >= 2))) continue; }
@@ -5120,7 +5248,7 @@ function tryUse(f, k) {
 /* ================= 업데이트 ================= */
 function updFighter(f, dt) {
   if (B.explore && f.hp <= 0) return;
-  if (f.minion && f.hp <= 0 && (f.illu || f.dreamOf || f.dkking || f.dmob || f.legion)) { f.script = null; f.cast = null; f.act = null; return; }   // 죽은 분신(환각/꿈/병사)은 땅 속에서 공격하지 않는다
+  if (f.minion && f.hp <= 0) { f.script = null; f.cast = null; f.act = null; return; }   // 죽은 분신(환각/꿈/병사)은 땅 속에서 공격하지 않는다
   if (f.sealHold) return;
   updCommon(f, dt);
   if (f.def.id === 'silent' && f.form === 'base' && !f.sealSoul && !f.soul && !(f.pseal > 0) && f.hp > 0 && f.hp <= 10000) enterHour(f);
@@ -5208,9 +5336,9 @@ function update(dt) {
   if (B.raid && !B.over) { B.raid.t -= dt; if (B.raid.t <= 0) { B.raid.t = 0; B.over = B.raid.boss; setTimeout(finish, 900); } }
   inR(() => B.fighters.forEach(f => updFighter(f, dt)));
   updBush();
-  for (const m of B.fighters) if ((m.legion || m.illu || m.dreamOf || m.dkking || m.dmob) && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
-  if (B.fighters.some(m => m.gone)) { B.fighters.filter(m => m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob)).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob))); }
-  updFxm(dt); updFire(dt); updLdoms(dt); updMystic(dt); updGold(dt); updGoldA(dt); updCracks(); updMA(dt); updMandu(dt); updLichRain(dt); updDka(dt); updLichA(dt); updLilyA(dt); updArchangel(dt); updBerry(dt); updTimekeeper(dt); updPitaya(dt); updAnanas(dt); updPitayaA(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
+  for (const m of B.fighters) if ((m.legion || m.illu || m.dreamOf || m.dkking || m.dmob || m.manduClone || m.statueOf) && m.hp <= 0) { m.deadT = (m.deadT || 0) + dt; if (m.deadT > 1) m.gone = true; }
+  if (B.fighters.some(m => m.gone)) { B.fighters.filter(m => m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob || m.manduClone || m.statueOf)).forEach(removeFighter); B.fighters = B.fighters.filter(m => !(m.gone && (m.legion || m.illu || m.dreamOf || m.dkking || m.dmob || m.manduClone || m.statueOf))); }
+  updFxm(dt); updBerryA(dt); updFire(dt); updLdoms(dt); updMystic(dt); updGold(dt); updGoldA(dt); updCracks(); updMA(dt); updMandu(dt); updLichRain(dt); updDka(dt); updLichA(dt); updLilyA(dt); updArchangel(dt); updBerry(dt); updTimekeeper(dt); updPitaya(dt); updAnanas(dt); updPitayaA(dt); updForks(dt); updSeal(dt); updLult(dt); updAbyss(dt);
   inR(() => { updProjs(dt); updBarriers(dt); updLights(dt); updStorm(dt); updZones(dt); updLakes(dt); updAngels(dt); updHexes(dt); });
   if (B.mind) { B.mind.t -= dt; if (B.mind.t <= 0) endMind(); }
   if (B.explore) { updExplore(dt); return; }

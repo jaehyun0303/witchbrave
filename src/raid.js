@@ -10,15 +10,19 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const pickN = (arr, n) => [...arr].sort(() => Math.random() - .5).slice(0, n);
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
-let ov, stage, ctx, onResize;
+let ov, stage, ctx, onResize, errH;
 function mount() {
-  ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:150;background:#05030f;overflow:hidden;user-select:none;-webkit-user-select:none';
+  ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:150;background:#05030f;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;pointer-events:auto';
   stage = document.createElement('div'); stage.style.cssText = `position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;${FONT};color:#fff`;
   ov.appendChild(stage); document.body.appendChild(ov);
   onResize = () => { const s = Math.min(innerWidth / 1280, innerHeight / 720); stage.style.transform = `translate(${(innerWidth - 1280 * s) / 2}px,${(innerHeight - 720 * s) / 2}px) scale(${s})`; };
   addEventListener('resize', onResize); onResize();
+  // 비상 탈출: 화면이 멈추거나 검게 막혔을 때(특히 모바일) 눌러서 레이드를 나간다. 스크립트 오류가 나도 자동으로 안내한다.
+  const esc = document.createElement('button'); esc.textContent = '✕ 나가기'; esc.style.cssText = 'position:absolute;left:8px;bottom:8px;z-index:5;padding:6px 12px;border:2px solid #fff6;border-radius:14px;background:#0008;color:#fff9;font:700 14px sans-serif;touch-action:manipulation'; esc.onclick = e => { e.stopPropagation(); if (confirm('레이드를 중단하고 나갈까요?')) location.reload(); }; ov.appendChild(esc);
+  errH = ev => { if (ov && !ov.querySelector('#rderr')) { const d = document.createElement('div'); d.id = 'rderr'; d.style.cssText = 'position:absolute;inset:0;z-index:9;background:#05030ff0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#fff;font:700 22px sans-serif;text-align:center'; d.innerHTML = '문제가 생겼어요<br><span style="font-size:14px;opacity:.7">' + String((ev && (ev.message || (ev.reason && ev.reason.message))) || '').slice(0, 120) + '</span>'; const b = document.createElement('button'); b.textContent = '나가기'; b.style.cssText = 'padding:12px 30px;font:900 22px sans-serif;border-radius:16px;border:3px solid #2b1830;background:#ffc233;touch-action:manipulation'; b.onclick = () => location.reload(); d.appendChild(b); ov.appendChild(d); } };
+  addEventListener('error', errH); addEventListener('unhandledrejection', errH);
 }
-const unmount = () => { removeEventListener('resize', onResize); ov && ov.remove(); ov = null; };
+const unmount = () => { removeEventListener('resize', onResize); errH && (removeEventListener('error', errH), removeEventListener('unhandledrejection', errH)); ov && ov.remove(); ov = null; };
 const hideOv = on => { if (ov) ov.style.display = on ? 'none' : 'block'; };
 const CSS = `<style>
 @keyframes zoomT{from{transform:scale(1)}to{transform:scale(3.2)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}

@@ -15,6 +15,7 @@ const VC = {
   dkkA: { url: 'assets/models/dkkA/dkkA.glb', h: 3.0 },
   lilyA: { url: 'assets/models/lilyA/lilyA.glb', h: 2.9 },
   berry: { url: 'assets/models/berry/berry.glb', h: 2.8 },
+  berryA: { url: 'assets/models/berryA/berryA.glb', h: 3.0 },
   timekeeper: { url: 'assets/models/timekeeper/timekeeper.glb', h: 2.7, skinned: true },
   pitaya: { url: 'assets/models/pitaya/pitaya.glb', h: 2.8, skinned: true },
   pitayaD: { url: 'assets/models/pitayaD/pitayaD.glb', h: 8 },   // 변신(용과드래곤) 모델

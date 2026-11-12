@@ -34,6 +34,7 @@ const META = {   // 등급 / 역할(탭 분류) / 설명용 능력치 (0~100)
   pv: { rar: '에인션트', group: '서포터', role: '마법 힐러', atk: 40, spd: 50, rng: 65 },
   dark: { rar: '레전더리', group: '딜러', role: '마녀', atk: 65, spd: 50, rng: 55 },
   burn: { rar: '비스트', group: '딜러', role: '근접 도끼 전사', atk: 72, spd: 50, rng: 22 },
+  berryA: { rar: '에인션트', group: '탱커', role: '거대 방패 수호자 (각성)', atk: 55, spd: 45, rng: 30 },
   berry: { rar: '에인션트', group: '탱커', role: '방패 수호자', atk: 40, spd: 40, rng: 25 },
   lilyA: { rar: '에인션트', group: '서포터', role: '자유의 백합', atk: 60, spd: 50, rng: 70 },
   timekeeper: { rar: '레전더리', group: '딜러', role: '시공간 지배자', atk: 70, spd: 55, rng: 50 },
@@ -262,7 +263,7 @@ build.mode = art => {
   bBtn.onclick = () => { st.mode = MODES[sel].id; back(); };
   byLabel(art, '닫기').onclick = back;
   // 상대 선택 (AI 대전의 상대 캐릭터)
-  const foeOpts = ['random', ...api.ORDER], chip = document.createElement('button');
+  const foeOpts = ['random', ...api.ORDER.flatMap(id => [id, api.CHARS[id].awakeId].filter(Boolean))], chip = document.createElement('button');
   chip.style.cssText = "position:absolute;left:690px;top:86px;width:320px;height:44px;padding:0;border:3px solid #2b1830;border-radius:16px;background:#fff;box-shadow:0 3px 0 #2b1830;font-family:'Jua',sans-serif;font-size:19px;color:#2b1830;cursor:pointer";
   const label = () => '상대: ' + (st.foe === 'random' ? '랜덤' : api.CHARS[st.foe].name) + '  ▶'; chip.textContent = label();
   chip.onclick = () => { st.foe = foeOpts[(foeOpts.indexOf(st.foe) + 1) % foeOpts.length]; chip.textContent = label(); }; panel.appendChild(chip);
